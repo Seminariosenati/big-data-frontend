@@ -40,7 +40,7 @@ export default function UploadPreviewModal({
 
     const showSourceColumn = files.length > 1
 
-    const combinedRows = useMemo(() => {
+    const combinedRows = useMemo<Array<Record<string, unknown> & { __source: string }>>(() => {
         return files.flatMap((f) => f.rows.map((row) => ({ __source: f.name, ...row })))
     }, [files])
 

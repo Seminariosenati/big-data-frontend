@@ -8,6 +8,8 @@ import DonutChartCard from '../components/dashboard/DonutChartCard'
 import DataTablePreview from '../components/dashboard/DataTablePreview'
 import UploadZone from '../components/dashboard/UploadZone'
 import EmptyState from '../components/dashboard/EmptyState'
+import DataCleaningPanel from '../components/dashboard/DataCleaningPanel'
+import SettingsPage from './SettingsPage'
 import { useDatasets } from '../lib/useDatasets'
 import { clearSession } from '../lib/api'
 
@@ -105,7 +107,7 @@ export default function DashboardPage() {
 
         {section === 'cargar' && <UploadZone onUploaded={refresh} onGoToClean={() => setSection('explorar')} />}
 
-        {section === 'explorar' && <DataTablePreview datasets={datasets} loading={loading} />}
+        {section === 'explorar' && <DataCleaningPanel datasets={datasets} loading={loading} onGoToUpload={() => setSection('cargar')} />}
 
         {section === 'reportes' && (
           <div className="report-grid">
@@ -118,37 +120,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {section === 'ajustes' && (
-          <div className="panel-card" style={{ maxWidth: 640 }}>
-            <div className="panel-title">Preferencias</div>
-            <div className="panel-subtitle">Estas opciones son solo visuales por ahora</div>
-            <div className="settings-list">
-              <div className="settings-row">
-                <div>
-                  <div className="settings-row-label">Notificaciones por correo</div>
-                  <div className="settings-row-hint">Recibe un aviso cuando termine de procesarse un archivo</div>
-                </div>
-                <button className="toggle on"><span className="toggle-knob" /></button>
-              </div>
-              <div className="settings-row">
-                <div>
-                  <div className="settings-row-label">Modo claro</div>
-                  <div className="settings-row-hint">Cambia la apariencia del panel</div>
-                </div>
-                <button className={`toggle ${isLight ? 'on' : ''}`} onClick={() => setIsLight((v) => !v)}>
-                  <span className="toggle-knob" />
-                </button>
-              </div>
-              <div className="settings-row">
-                <div>
-                  <div className="settings-row-label">Compartir reportes automáticamente</div>
-                  <div className="settings-row-hint">Envía una copia del reporte semanal a tu equipo</div>
-                </div>
-                <button className="toggle"><span className="toggle-knob" /></button>
-              </div>
-            </div>
-          </div>
-        )}
+        {section === 'ajustes' && <SettingsPage isLight={isLight} onToggleTheme={() => setIsLight((v) => !v)} totalRows={stats?.totalRows ?? 0} totalFiles={stats?.totalFiles ?? 0} />}
       </DashboardLayout>
     </div>
   )

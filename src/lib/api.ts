@@ -12,7 +12,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok) {
-        throw new Error(data.error || 'Ocurrió un error inesperado')
+        throw new Error(data.detail || data.error || data.message || 'Ocurrió un error inesperado')
     }
 
     return data as T
@@ -54,6 +54,10 @@ export function resendOtp(input: { email: string }) {
         method: 'POST',
         body: JSON.stringify(input),
     })
+}
+
+export function validateSession() {
+    return request<{ id?: string; email?: string }>('/profile/me', { headers: authHeaders() })
 }
 
 export interface DatasetColumnSummary {
@@ -123,7 +127,15 @@ export function saveSession(session: AuthSession) {
 
 export function getSession(): AuthSession | null {
     const raw = localStorage.getItem(SESSION_KEY)
-    return raw ? JSON.parse(raw) : null
+    if (!raw) return null
+
+    try {
+        const session = JSON.parse(raw) as AuthSession
+        return session.access_token && session.refresh_token ? session : null
+    } catch {
+        clearSession()
+        return null
+    }
 }
 
 export function clearSession() {

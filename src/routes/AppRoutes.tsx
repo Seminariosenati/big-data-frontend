@@ -7,6 +7,7 @@ import ServicesPage from '../pages/ServicesPage'
 import ContactPage from '../pages/ContactPage'
 import LoginPage from '../pages/LoginPage'
 import DashboardPage from '../pages/DashboardPage'
+import ProtectedRoute from './ProtectedRoute'
 
 export default function AppRoutes() {
   return (
@@ -21,7 +22,9 @@ export default function AppRoutes() {
 
       {/* Rutas independientes sin layout principal */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard" element={<DashboardPage />} />
+      </Route>
     </Routes>
   )
 }

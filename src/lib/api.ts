@@ -56,6 +56,27 @@ export function resendOtp(input: { email: string }) {
     })
 }
 
+export interface Profile {
+    id: string
+    email: string
+    full_name: string | null
+    company: string | null
+    phone: string | null
+    role: string | null
+}
+
+export function getMyProfile() {
+    return request<Profile>('/profile/me', { headers: authHeaders() })
+}
+
+export function updateMyProfile(input: { full_name?: string; company?: string; phone?: string; role?: string }) {
+    return request<Profile>('/profile/me', {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify(input),
+    })
+}
+
 export function validateSession() {
     return request<{ id?: string; email?: string }>('/profile/me', { headers: authHeaders() })
 }
@@ -147,8 +168,49 @@ export interface DatasetPreview {
     columns: string[]
     totalRows: number
     rows: Record<string, unknown>[]
+    summary?: {
+        duplicatesRemoved: number
+        emptyRowsRemoved: number
+        columnsRemoved: string[]
+        nullsFilled: number
+    }
+}
+
+export interface CleaningOptions {
+    remove_duplicates: boolean
+    null_strategy: 'ignore' | 'remove_row' | 'set_null' | 'zero' | 'average'
+    convert_number: boolean
+    convert_dates: boolean
+    remove_empty_columns: boolean
+}
+
+export interface CleaningLog {
+    id: string
+    action: 'duplicate_removed' | 'empty_row_removed' | 'column_removed' | 'nulls_filled'
+    row_data: Record<string, unknown>
+    created_at: string
+}
+
+export function getCleaningLogs(id: string) {
+    return request<{ logs: CleaningLog[] }>(`/datasets/${id}/cleaning-logs`, { headers: authHeaders() })
 }
 
 export function getDatasetPreview(id: string) {
     return request<DatasetPreview>(`/datasets/${id}/preview`, { headers: authHeaders() })
+}
+
+export function previewCleanDataset(id: string, options: CleaningOptions) {
+    return request<DatasetPreview>(`/datasets/${id}/clean-preview`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(options),
+    })
+}
+
+export function applyCleanDataset(id: string, options: CleaningOptions) {
+    return request<DatasetPreview>(`/datasets/${id}/clean`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(options),
+    })
 }

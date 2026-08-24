@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Bell,
   Camera,
@@ -11,6 +11,7 @@ import {
   Sun,
   UserRound,
 } from 'lucide-react'
+import { getMyProfile, updateMyProfile } from '../lib/api'
 
 interface SettingsPageProps {
   isLight: boolean
@@ -20,17 +21,35 @@ interface SettingsPageProps {
 }
 
 export default function SettingsPage({ isLight, onToggleTheme, totalRows, totalFiles }: SettingsPageProps) {
-  const [firstName, setFirstName] = useState('María')
-  const [lastName, setLastName] = useState('Cruz')
-  const [email, setEmail] = useState('maria.cruz@empresa.com')
-  const [phone, setPhone] = useState('+51 999 000 000')
-  const [role, setRole] = useState('Analista de datos')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [role, setRole] = useState('')
   const [avatar, setAvatar] = useState<string | null>(null)
   const [emailAlerts, setEmailAlerts] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' })
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
   const avatarInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    getMyProfile()
+      .then((profile) => {
+        const [first, ...rest] = (profile.full_name ?? '').split(' ')
+        setFirstName(first ?? '')
+        setLastName(rest.join(' '))
+        setEmail(profile.email ?? '')
+        setPhone(profile.phone ?? '')
+        setRole(profile.role ?? '')
+      })
+      .catch(() => { })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const initials = (firstName[0] ?? '') + (lastName[0] ?? '') || '—'
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -40,10 +59,18 @@ export default function SettingsPage({ isLight, onToggleTheme, totalRows, totalF
     reader.readAsDataURL(file)
   }
 
-  const handleSave = (event: React.FormEvent) => {
+  const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
-    setSaved(true)
-    window.setTimeout(() => setSaved(false), 2400)
+    setSaving(true)
+    try {
+      await updateMyProfile({ full_name: `${firstName} ${lastName}`.trim(), phone, role })
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2400)
+    } catch {
+      // si falla, simplemente no se muestra la confirmación
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handlePasswordChange = (event: React.FormEvent) => {
@@ -67,25 +94,25 @@ export default function SettingsPage({ isLight, onToggleTheme, totalRows, totalF
 
             <div className="profile-editor">
               <div className="avatar-editor">
-                {avatar ? <img src={avatar} alt="Avatar de usuario" /> : <span>MC</span>}
+                {avatar ? <img src={avatar} alt="Avatar de usuario" /> : <span>{initials.toUpperCase()}</span>}
                 <button type="button" className="avatar-edit" onClick={() => avatarInput.current?.click()} aria-label="Cambiar foto de perfil">
                   <Camera size={14} />
                 </button>
                 <input ref={avatarInput} type="file" accept="image/*" onChange={handleAvatarChange} hidden />
               </div>
               <div>
-                <strong>{firstName} {lastName}</strong>
+                <strong>{loading ? 'Cargando…' : `${firstName} ${lastName}`.trim() || 'Sin nombre'}</strong>
                 <p>JPG o PNG, hasta 5 MB</p>
                 <button type="button" className="link-btn" onClick={() => avatarInput.current?.click()}>Cambiar foto</button>
               </div>
             </div>
 
             <div className="settings-form-grid">
-              <label className="settings-input"><span>Nombre</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label>
-              <label className="settings-input"><span>Apellidos</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
-              <label className="settings-input settings-input-wide"><span>Correo electrónico</span><div className="settings-input-icon"><Mail size={15} /><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div></label>
-              <label className="settings-input"><span>Teléfono</span><div className="settings-input-icon"><Phone size={15} /><input value={phone} onChange={(event) => setPhone(event.target.value)} /></div></label>
-              <label className="settings-input"><span>Rol / Cargo</span><input value={role} onChange={(event) => setRole(event.target.value)} /></label>
+              <label className="settings-input"><span>Nombre</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} disabled={loading} /></label>
+              <label className="settings-input"><span>Apellidos</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} disabled={loading} /></label>
+              <label className="settings-input settings-input-wide"><span>Correo electrónico</span><div className="settings-input-icon"><Mail size={15} /><input type="email" value={email} disabled readOnly /></div></label>
+              <label className="settings-input"><span>Teléfono</span><div className="settings-input-icon"><Phone size={15} /><input value={phone} onChange={(event) => setPhone(event.target.value)} disabled={loading} /></div></label>
+              <label className="settings-input"><span>Rol / Cargo</span><input value={role} onChange={(event) => setRole(event.target.value)} disabled={loading} /></label>
             </div>
           </section>
 
@@ -120,7 +147,7 @@ export default function SettingsPage({ isLight, onToggleTheme, totalRows, totalF
           <section className="panel-card account-note"><Check size={18} /><div><strong>Cuenta protegida</strong><p>Tu sesión y preferencias están guardadas en este dispositivo.</p></div></section>
         </aside>
       </div>
-      <div className="settings-actions">{saved && <span className="save-feedback"><Check size={15} /> Cambios guardados</span>}<button type="submit" className="btn btn-primary">Guardar cambios</button></div>
+      <div className="settings-actions">{saved && <span className="save-feedback"><Check size={15} /> Cambios guardados</span>}<button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button></div>
     </form>
   )
 }

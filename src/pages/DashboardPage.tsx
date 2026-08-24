@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileBarChart2, Database, FileSpreadsheet, Table2 } from 'lucide-react'
 import DashboardLayout, { type DashboardSection } from '../layouts/DashboardLayout'
@@ -11,7 +11,7 @@ import EmptyState from '../components/dashboard/EmptyState'
 import DataCleaningPanel from '../components/dashboard/DataCleaningPanel'
 import SettingsPage from './SettingsPage'
 import { useDatasets } from '../lib/useDatasets'
-import { clearSession } from '../lib/api'
+import { clearSession, getMyProfile, type Profile } from '../lib/api'
 
 const SECTION_META: Record<DashboardSection, { title: string; subtitle: string }> = {
   resumen: { title: 'Dashboard', subtitle: 'Vista general de tus datos procesados' },
@@ -24,8 +24,13 @@ const SECTION_META: Record<DashboardSection, { title: string; subtitle: string }
 export default function DashboardPage() {
   const [section, setSection] = useState<DashboardSection>('resumen')
   const [isLight, setIsLight] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const navigate = useNavigate()
   const { datasets, stats, loading, error, refresh } = useDatasets()
+
+  useEffect(() => {
+    getMyProfile().then(setProfile).catch(() => { })
+  }, [])
 
   const meta = SECTION_META[section]
 
@@ -69,6 +74,8 @@ export default function DashboardPage() {
         subtitle={meta.subtitle}
         isLight={isLight}
         onToggleTheme={() => setIsLight((v) => !v)}
+        userEmail={profile?.email}
+        userName={profile?.full_name ?? undefined}
         onLogout={() => {
           clearSession()
           navigate('/')

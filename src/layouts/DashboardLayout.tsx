@@ -36,6 +36,8 @@ interface DashboardLayoutProps {
   isLight: boolean
   onToggleTheme: () => void
   onLogout: () => void
+  userEmail?: string
+  userName?: string
   children: ReactNode
 }
 
@@ -48,8 +50,13 @@ export default function DashboardLayout({
   isLight,
   onToggleTheme,
   onLogout,
+  userEmail,
+  userName,
   children,
 }: DashboardLayoutProps) {
+  const initials = userName
+    ? userName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
+    : (userEmail?.[0] ?? '?').toUpperCase()
   return (
     <div className="dash-shell">
       <aside className="dash-sidebar">
@@ -86,10 +93,10 @@ export default function DashboardLayout({
           </button>
 
           <div className="dash-user">
-            <span className="dash-user-avatar">MC</span>
+            <span className="dash-user-avatar">{initials}</span>
             <div>
-              <div className="dash-user-name">maria.cruz@empresa.com</div>
-              <div className="dash-user-role">Cuenta de demostración</div>
+              <div className="dash-user-name">{userEmail ?? 'Cargando…'}</div>
+              <div className="dash-user-role">{userName || 'Sin nombre'}</div>
             </div>
           </div>
 

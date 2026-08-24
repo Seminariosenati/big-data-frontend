@@ -21,7 +21,7 @@ function buildMonthlyVolume(datasets: Dataset[]) {
     const d = new Date(dataset.created_at)
     const key = `${d.getFullYear()}-${d.getMonth()}`
     const bucket = byKey.get(key)
-    if (bucket) bucket.value += Math.round(dataset.row_count / 1000)
+    if (bucket) bucket.value += dataset.row_count
   }
 
   return months
@@ -41,7 +41,7 @@ export default function BarChartCard({ datasets }: BarChartCardProps) {
             <div
               className="bar-chart-bar"
               style={{ height: `${(m.value / max) * 100}%` }}
-              title={`${m.label}: ${m.value}k registros`}
+              title={`${m.label}: ${m.value.toLocaleString('es-PE')} registros`}
             />
             <span className="bar-chart-label">{m.label}</span>
           </div>

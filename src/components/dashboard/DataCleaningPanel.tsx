@@ -191,8 +191,8 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload }: D
         </div>
       )}
 
-      {historyOpen && selected && (
-        <CleaningHistoryModal datasetId={selected.id} fileName={selected.file_name} onClose={() => setHistoryOpen(false)} />
+      {historyOpen && (
+        <CleaningHistoryModal datasets={datasets} onClose={() => setHistoryOpen(false)} />
       )}
     </div>
   )

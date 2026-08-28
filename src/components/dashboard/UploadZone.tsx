@@ -27,7 +27,7 @@ interface UploadItem {
   previewError?: string
 }
 
-const PREVIEW_ROW_LIMIT = 500
+const PREVIEW_ROW_LIMIT = 50
 
 function parseFilePreview(file: File): Promise<FilePreview> {
   const isCsv = /\.csv$/i.test(file.name)

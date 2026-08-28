@@ -214,3 +214,24 @@ export function applyCleanDataset(id: string, options: CleaningOptions) {
         body: JSON.stringify(options),
     })
 }
+
+export interface ChartColumn {
+    name: string
+    type: 'numeric' | 'categorical'
+}
+
+export interface ChartColumnData {
+    column: string
+    type: 'numeric' | 'categorical'
+    data: { label: string; value: number }[]
+}
+
+export function getChartColumns() {
+    return request<{ columns: ChartColumn[] }>('/datasets/charts/columns', { headers: authHeaders() })
+}
+
+export function getChartColumnData(column: string) {
+    return request<ChartColumnData>(`/datasets/charts/data?column=${encodeURIComponent(column)}`, {
+        headers: authHeaders(),
+    })
+}

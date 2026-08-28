@@ -5,6 +5,7 @@ import DashboardLayout, { type DashboardSection } from '../layouts/DashboardLayo
 import StatCard from '../components/dashboard/StatCard'
 import BarChartCard from '../components/dashboard/BarChartCard'
 import DonutChartCard from '../components/dashboard/DonutChartCard'
+import CleanedDataChartCard from '../components/dashboard/CleanedDataChartCard'
 import DataTablePreview from '../components/dashboard/DataTablePreview'
 import UploadZone from '../components/dashboard/UploadZone'
 import EmptyState from '../components/dashboard/EmptyState'
@@ -107,6 +108,8 @@ export default function DashboardPage() {
                 error={stats?.qualityBreakdown.error ?? 0}
               />
             </div>
+
+            <CleanedDataChartCard refreshKey={datasets.length} />
 
             <DataTablePreview datasets={datasets} loading={loading} />
           </>

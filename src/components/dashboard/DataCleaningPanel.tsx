@@ -8,6 +8,10 @@ interface DataCleaningPanelProps {
   datasets: Dataset[]
   loading?: boolean
   onGoToUpload: () => void
+  /** Se llama después de aplicar la limpieza con éxito, para que el padre
+   * vuelva a pedir la lista de datasets y la fila (calidad/estado) se
+   * actualice sin tener que recargar la página. */
+  onCleaned?: () => void
 }
 
 const STATUS_LABELS = { ok: 'Procesado', warn: 'En revisión', error: 'Error', processing: 'Procesando' } as const
@@ -25,7 +29,7 @@ function downloadCsv(preview: DatasetPreview | null, fileName: string) {
   URL.revokeObjectURL(url)
 }
 
-export default function DataCleaningPanel({ datasets, loading, onGoToUpload }: DataCleaningPanelProps) {
+export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onCleaned }: DataCleaningPanelProps) {
   const [selectedId, setSelectedId] = useState('')
   const [beforePreview, setBeforePreview] = useState<DatasetPreview | null>(null)
   const [afterPreview, setAfterPreview] = useState<DatasetPreview | null>(null)
@@ -86,6 +90,11 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload }: D
     try {
       setAfterPreview(await applyCleanDataset(selected.id, options))
       setApplied(true)
+      // El backend ya recalculó calidad/estado (queda "Procesado" en vez de
+      // seguir mostrando el valor de antes de limpiar); refrescamos la lista
+      // del padre para que la tabla y el resto del dashboard lo reflejen ya,
+      // sin que el usuario tenga que recargar la página.
+      onCleaned?.()
     } catch {
       // el fallo se refleja en que applied se queda en false
     } finally {
@@ -93,7 +102,7 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload }: D
     }
   }
 
-  if (loading) return <div className="cleaning-loading">Cargando archivos…</div>
+  if (loading && datasets.length === 0) return <div className="cleaning-loading">Cargando archivos…</div>
 
   return (
     <div className="cleaning-page">

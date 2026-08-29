@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { getChartColumns, getChartColumnData, type ChartColumn, type ChartColumnData } from '../../lib/api'
+import { getChartColumnsForDataset, getChartColumnDataForDataset, type ChartColumn, type ChartColumnData, type Dataset } from '../../lib/api'
 
 interface CleanedDataChartCardProps {
+  datasets: Dataset[]
+  /** Dataset activo, compartido con "Registros" para que ambos cambien juntos. */
+  selectedId: string
   refreshKey?: number
 }
 
-export default function CleanedDataChartCard({ refreshKey }: CleanedDataChartCardProps) {
+export default function CleanedDataChartCard({ datasets, selectedId, refreshKey }: CleanedDataChartCardProps) {
   const [columns, setColumns] = useState<ChartColumn[]>([])
   const [selected, setSelected] = useState<string>('')
   const [chartData, setChartData] = useState<ChartColumnData | null>(null)
@@ -13,30 +16,40 @@ export default function CleanedDataChartCard({ refreshKey }: CleanedDataChartCar
   const [loadingData, setLoadingData] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const activeId = selectedId || datasets[0]?.id || ''
+  const activeDataset = datasets.find((d) => d.id === activeId)
+
+  // Cambio de dataset (o de datasets tras subir uno nuevo): recargar las
+  // columnas disponibles de la versión limpia de ESE archivo puntual.
   useEffect(() => {
+    if (!activeId) {
+      setColumns([])
+      setLoadingColumns(false)
+      return
+    }
     setLoadingColumns(true)
     setError(null)
-    getChartColumns()
+    getChartColumnsForDataset(activeId)
       .then((res) => {
         setColumns(res.columns)
         setSelected((prev) => (res.columns.some((c) => c.name === prev) ? prev : res.columns[0]?.name ?? ''))
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'No se pudieron cargar las columnas'))
       .finally(() => setLoadingColumns(false))
-  }, [refreshKey])
+  }, [activeId, refreshKey])
 
   useEffect(() => {
-    if (!selected) {
+    if (!activeId || !selected) {
       setChartData(null)
       return
     }
     setLoadingData(true)
     setError(null)
-    getChartColumnData(selected)
+    getChartColumnDataForDataset(activeId, selected)
       .then(setChartData)
       .catch((err) => setError(err instanceof Error ? err.message : 'No se pudieron cargar los datos'))
       .finally(() => setLoadingData(false))
-  }, [selected])
+  }, [activeId, selected])
 
   const max = Math.max(1, ...(chartData?.data.map((d) => d.value) ?? [0]))
 
@@ -67,9 +80,9 @@ export default function CleanedDataChartCard({ refreshKey }: CleanedDataChartCar
         <div>
           <div className="panel-title" style={{ marginBottom: 2 }}>Datos limpios por columna</div>
           <div className="panel-subtitle" style={{ marginBottom: 0 }}>
-            {chartData?.type === 'numeric'
-              ? 'Distribución de valores (todos tus datasets limpios)'
-              : 'Conteo de categorías (todos tus datasets limpios)'}
+            {activeDataset
+              ? `${chartData?.type === 'numeric' ? 'Distribución de valores' : 'Conteo de categorías'} · ${activeDataset.file_name}`
+              : 'Selecciona un archivo para ver su gráfico'}
           </div>
         </div>
 
@@ -95,7 +108,9 @@ export default function CleanedDataChartCard({ refreshKey }: CleanedDataChartCar
 
       {!loadingColumns && columns.length === 0 && !error && (
         <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-faint)' }}>
-          Todavía no tienes datasets limpios. Limpia un dataset en "Limpieza de datos" para ver gráficos aquí.
+          {activeDataset
+            ? `"${activeDataset.file_name}" todavía no tiene una versión limpia. Límpialo en "Limpieza de datos" para ver gráficos aquí.`
+            : 'Todavía no tienes datasets limpios. Limpia un dataset en "Limpieza de datos" para ver gráficos aquí.'}
         </div>
       )}
 

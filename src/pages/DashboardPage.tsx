@@ -29,6 +29,11 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const { datasets, stats, loading, error, refresh } = useDatasets()
 
+  // Dataset activo compartido entre "Registros" y el gráfico "Datos limpios
+  // por columna": cambiarlo en cualquiera de los dos actualiza ambos.
+  const [selectedDatasetId, setSelectedDatasetId] = useState('')
+  const activeDatasetId = selectedDatasetId || datasets[0]?.id || ''
+
   useEffect(() => {
     getMyProfile().then(setProfile).catch(() => { })
   }, [])
@@ -109,15 +114,31 @@ export default function DashboardPage() {
               />
             </div>
 
-            <CleanedDataChartCard refreshKey={datasets.length} />
+            <CleanedDataChartCard
+              datasets={datasets}
+              selectedId={activeDatasetId}
+              refreshKey={datasets.length}
+            />
 
-            <RecordsTablePreview datasets={datasets} loading={loading} />
+            <RecordsTablePreview
+              datasets={datasets}
+              loading={loading}
+              selectedId={activeDatasetId}
+              onSelectId={setSelectedDatasetId}
+            />
           </>
         )}
 
-        {section === 'cargar' && <UploadZone onUploaded={refresh} onGoToClean={() => setSection('explorar')} />}
+        {section === 'cargar' && (
+          <UploadZone
+            datasets={datasets}
+            datasetsLoading={loading}
+            onUploaded={refresh}
+            onGoToClean={() => setSection('explorar')}
+          />
+        )}
 
-        {section === 'explorar' && <DataCleaningPanel datasets={datasets} loading={loading} onGoToUpload={() => setSection('cargar')} />}
+        {section === 'explorar' && <DataCleaningPanel datasets={datasets} loading={loading} onGoToUpload={() => setSection('cargar')} onCleaned={refresh} />}
 
         {section === 'reportes' && (
           <div className="report-grid">

@@ -199,6 +199,12 @@ export function getDatasetPreview(id: string) {
     return request<DatasetPreview>(`/datasets/${id}/preview`, { headers: authHeaders() })
 }
 
+// Vista previa de la versión YA LIMPIA (no el archivo tal como se subió).
+// La usa el Dashboard, que debe mostrar datos después de la limpieza.
+export function getCleanedDatasetPreview(id: string) {
+    return request<DatasetPreview>(`/datasets/${id}/cleaned-preview`, { headers: authHeaders() })
+}
+
 export function previewCleanDataset(id: string, options: CleaningOptions) {
     return request<DatasetPreview>(`/datasets/${id}/clean-preview`, {
         method: 'POST',
@@ -232,6 +238,36 @@ export function getChartColumns() {
 
 export function getChartColumnData(column: string) {
     return request<ChartColumnData>(`/datasets/charts/data?column=${encodeURIComponent(column)}`, {
+        headers: authHeaders(),
+    })
+}
+
+// Variantes "por dataset": el gráfico del dashboard usa estas para mostrar
+// solo los datos del archivo que el usuario tiene seleccionado, en vez de
+// agregar todos sus datasets limpios.
+export function getChartColumnsForDataset(datasetId: string) {
+    return request<{ columns: ChartColumn[] }>(`/datasets/${datasetId}/charts/columns`, {
+        headers: authHeaders(),
+    })
+}
+
+export function getChartColumnDataForDataset(datasetId: string, column: string) {
+    return request<ChartColumnData>(`/datasets/${datasetId}/charts/data?column=${encodeURIComponent(column)}`, {
+        headers: authHeaders(),
+    })
+}
+
+// Variantes "sin limpiar": usan el archivo tal como se subió (con nulos,
+// duplicados y valores mal formateados), para la pestaña de gráficos de
+// "Cargar datos".
+export function getRawChartColumnsForDataset(datasetId: string) {
+    return request<{ columns: ChartColumn[] }>(`/datasets/${datasetId}/charts/raw/columns`, {
+        headers: authHeaders(),
+    })
+}
+
+export function getRawChartColumnDataForDataset(datasetId: string, column: string) {
+    return request<ChartColumnData>(`/datasets/${datasetId}/charts/raw/data?column=${encodeURIComponent(column)}`, {
         headers: authHeaders(),
     })
 }

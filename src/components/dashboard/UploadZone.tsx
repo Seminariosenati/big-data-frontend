@@ -2,11 +2,16 @@ import { useRef, useState } from 'react'
 import { UploadCloud, XCircle } from 'lucide-react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
-import { uploadDataset } from '../../lib/api'
+import { uploadDataset, type Dataset } from '../../lib/api'
 import UploadPreviewModal from './UploadPreviewModal'
 import UploadSuccessModal from './UploadSuccessModal'
+import RawDataChartCard from './RawDataChartCard'
+import DatasetDetailPanel from './DatasetDetailPanel'
 
 interface UploadZoneProps {
+  /** Historial de archivos ya subidos, para listarlo debajo del dropzone. */
+  datasets: Dataset[]
+  datasetsLoading?: boolean
   onUploaded?: () => void
   onGoToClean?: () => void
 }
@@ -28,6 +33,11 @@ interface UploadItem {
 }
 
 const PREVIEW_ROW_LIMIT = 50
+
+const STATUS_LABELS = { ok: 'Procesado', warn: 'En revisión', error: 'Error', processing: 'Procesando' } as const
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 function parseFilePreview(file: File): Promise<FilePreview> {
   const isCsv = /\.csv$/i.test(file.name)
@@ -56,12 +66,14 @@ function parseFilePreview(file: File): Promise<FilePreview> {
   })
 }
 
-export default function UploadZone({ onUploaded, onGoToClean }: UploadZoneProps) {
+export default function UploadZone({ datasets, datasetsLoading, onUploaded, onGoToClean }: UploadZoneProps) {
   const [items, setItems] = useState<UploadItem[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [rejectedFiles, setRejectedFiles] = useState<string[]>([])
   const [successCount, setSuccessCount] = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState<'historial' | 'graficos'>('historial')
+  const [detailId, setDetailId] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const addFiles = (fileList: FileList | null) => {
@@ -135,86 +147,169 @@ export default function UploadZone({ onUploaded, onGoToClean }: UploadZoneProps)
   }
 
   return (
-    <div className="panel-card">
-      <div className="panel-title">Cargar nuevos archivos</div>
-      <div className="panel-subtitle">Arrastra uno o varios archivos CSV / Excel para empezar.</div>
+    <div>
+      <div className="panel-card">
+        <div className="panel-title">Cargar nuevos archivos</div>
+        <div className="panel-subtitle">Arrastra uno o varios archivos CSV / Excel para empezar.</div>
 
-      <div
-        className="dropzone"
-        onDragOver={(e) => {
-          e.preventDefault()
-          setIsDragging(true)
-        }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setIsDragging(false)
-          addFiles(e.dataTransfer.files)
-        }}
-        onClick={() => inputRef.current?.click()}
-        style={isDragging ? { borderColor: 'var(--primary)' } : undefined}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          multiple
-          hidden
-          onChange={(e) => {
-            addFiles(e.target.files)
-            e.target.value = ''
+        <div
+          className="dropzone"
+          onDragOver={(e) => {
+            e.preventDefault()
+            setIsDragging(true)
           }}
-        />
-        <span className="dropzone-icon">
-          <UploadCloud size={22} strokeWidth={2} />
-        </span>
-        <div className="dropzone-title">Arrastra tus archivos o haz clic para elegirlos</div>
-        <div className="dropzone-subtitle">Formatos soportados: .csv, .xlsx — hasta 200 MB · puedes elegir varios</div>
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setIsDragging(false)
+            addFiles(e.dataTransfer.files)
+          }}
+          onClick={() => inputRef.current?.click()}
+          style={isDragging ? { borderColor: 'var(--primary)' } : undefined}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            multiple
+            hidden
+            onChange={(e) => {
+              addFiles(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <span className="dropzone-icon">
+            <UploadCloud size={22} strokeWidth={2} />
+          </span>
+          <div className="dropzone-title">Arrastra tus archivos o haz clic para elegirlos</div>
+          <div className="dropzone-subtitle">Formatos soportados: .csv, .xlsx — hasta 200 MB · puedes elegir varios</div>
+        </div>
+
+        {rejectedFiles.length > 0 && (
+          <div className="upload-list">
+            {rejectedFiles.map((name, idx) => (
+              <div className="upload-row" key={`${name}-${idx}`}>
+                <span className="upload-row-icon">
+                  <XCircle size={16} color="var(--danger)" />
+                </span>
+                <div className="upload-row-info">
+                  <div className="upload-row-name">{name}</div>
+                  <div className="upload-row-meta">Formato no soportado</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {modalOpen && (
+          <UploadPreviewModal
+            files={pendingWithPreview.map((it) => ({
+              id: it.id,
+              name: it.name,
+              columns: it.preview!.columns,
+              rows: it.preview!.rows,
+              totalRows: it.preview!.totalRows,
+              status: it.status,
+              errorMessage: it.errorMessage,
+            }))}
+            isUploading={isUploading}
+            onClose={closeModal}
+            onConfirmUpload={handleUploadAll}
+            onAddFiles={addFiles}
+          />
+        )}
+
+        {successCount !== null && (
+          <UploadSuccessModal
+            fileCount={successCount}
+            onClose={() => setSuccessCount(null)}
+            onGoToClean={() => {
+              setSuccessCount(null)
+              onGoToClean?.()
+            }}
+          />
+        )}
       </div>
 
-      {rejectedFiles.length > 0 && (
-        <div className="upload-list">
-          {rejectedFiles.map((name, idx) => (
-            <div className="upload-row" key={`${name}-${idx}`}>
-              <span className="upload-row-icon">
-                <XCircle size={16} color="var(--danger)" />
-              </span>
-              <div className="upload-row-info">
-                <div className="upload-row-name">{name}</div>
-                <div className="upload-row-meta">Formato no soportado</div>
-              </div>
-            </div>
-          ))}
+      <div className="panel-card" style={{ marginTop: 20 }}>
+        <div className="panel-title">Datos cargados</div>
+        <div className="panel-subtitle">Revisa el historial de archivos o mira cómo se ven sus datos antes de limpiarlos.</div>
+
+        <div className="auth-tabs" style={{ maxWidth: 360, marginTop: 14, marginBottom: 0 }}>
+          <button
+            type="button"
+            className={`auth-tab ${activeTab === 'historial' ? 'active' : ''}`}
+            onClick={() => setActiveTab('historial')}
+          >
+            Archivos cargados
+          </button>
+          <button
+            type="button"
+            className={`auth-tab ${activeTab === 'graficos' ? 'active' : ''}`}
+            onClick={() => setActiveTab('graficos')}
+          >
+            Gráficos sin limpiar
+          </button>
         </div>
-      )}
 
-      {modalOpen && (
-        <UploadPreviewModal
-          files={pendingWithPreview.map((it) => ({
-            id: it.id,
-            name: it.name,
-            columns: it.preview!.columns,
-            rows: it.preview!.rows,
-            totalRows: it.preview!.totalRows,
-            status: it.status,
-            errorMessage: it.errorMessage,
-          }))}
-          isUploading={isUploading}
-          onClose={closeModal}
-          onConfirmUpload={handleUploadAll}
-          onAddFiles={addFiles}
-        />
-      )}
+        <div style={{ marginTop: 16 }}>
+          {activeTab === 'historial' && (
+            datasetsLoading ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-faint)' }}>Cargando…</div>
+            ) : datasets.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-faint)' }}>
+                Todavía no has subido ningún archivo.
+              </div>
+            ) : (
+              <div className="data-table-wrapper">
+                <table className="data-table cleaning-table">
+                  <thead>
+                    <tr>
+                      <th>Archivo</th>
+                      <th>Filas</th>
+                      <th>Columnas</th>
+                      <th>Calidad</th>
+                      <th>Estado</th>
+                      <th>Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {datasets.map((d) => (
+                      <tr
+                        key={d.id}
+                        className={(detailId || datasets[0]?.id) === d.id ? 'selected' : ''}
+                        onClick={() => setDetailId(d.id)}
+                      >
+                        <td><strong>{d.file_name}</strong></td>
+                        <td>{d.row_count.toLocaleString('es-PE')}</td>
+                        <td>{d.column_count}</td>
+                        <td><span className="quality-badge">{d.quality_score}%</span></td>
+                        <td>
+                          <span className={`status-pill ${d.status === 'processing' ? 'warn' : d.status}`}>
+                            {STATUS_LABELS[d.status]}
+                          </span>
+                        </td>
+                        <td>{formatDate(d.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
 
-      {successCount !== null && (
-        <UploadSuccessModal
-          fileCount={successCount}
-          onClose={() => setSuccessCount(null)}
-          onGoToClean={() => {
-            setSuccessCount(null)
-            onGoToClean?.()
-          }}
-        />
+          {activeTab === 'graficos' && (
+            datasetsLoading ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-faint)' }}>Cargando…</div>
+            ) : (
+              <RawDataChartCard datasets={datasets} />
+            )
+          )}
+        </div>
+      </div>
+
+      {activeTab === 'historial' && !datasetsLoading && datasets.length > 0 && (
+        <DatasetDetailPanel datasets={datasets} selectedId={detailId} onSelectId={setDetailId} />
       )}
     </div>
   )

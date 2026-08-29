@@ -1,21 +1,27 @@
 import { useEffect, useState } from 'react'
-import { getDatasetPreview, type Dataset, type DatasetPreview } from '../../lib/api'
+import { getCleanedDatasetPreview, type Dataset, type DatasetPreview } from '../../lib/api'
 
 const ROW_LIMIT = 10
+const NOT_CLEANED_MESSAGE = 'Este archivo todavía no ha sido limpiado. Ve a "Limpieza de datos" para procesarlo.'
 
 interface RecordsTablePreviewProps {
   datasets: Dataset[]
   loading?: boolean
+  /** Dataset activo, compartido con el resto del dashboard (p. ej. el
+   * gráfico "Datos limpios por columna") para que ambos cambien juntos. */
+  selectedId: string
+  onSelectId: (id: string) => void
 }
 
-export default function RecordsTablePreview({ datasets, loading }: RecordsTablePreviewProps) {
-  const [selectedId, setSelectedId] = useState('')
+export default function RecordsTablePreview({ datasets, loading, selectedId, onSelectId }: RecordsTablePreviewProps) {
   const [preview, setPreview] = useState<DatasetPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError] = useState('')
 
   const activeId = selectedId || datasets[0]?.id || ''
 
+  // El Dashboard debe mostrar los datos DESPUÉS de la limpieza, no el
+  // archivo tal como se subió, así que pedimos la versión limpia.
   useEffect(() => {
     if (!activeId) {
       setPreview(null)
@@ -23,9 +29,10 @@ export default function RecordsTablePreview({ datasets, loading }: RecordsTableP
     }
     setPreviewLoading(true)
     setError('')
-    getDatasetPreview(activeId)
+    setPreview(null)
+    getCleanedDatasetPreview(activeId)
       .then(setPreview)
-      .catch(() => setError('No se pudieron cargar los registros de este archivo'))
+      .catch((err) => setError(err instanceof Error ? err.message : NOT_CLEANED_MESSAGE))
       .finally(() => setPreviewLoading(false))
   }, [activeId])
 
@@ -38,7 +45,7 @@ export default function RecordsTablePreview({ datasets, loading }: RecordsTableP
         <div>
           <div className="panel-title" style={{ marginBottom: 2 }}>Registros</div>
           <div className="panel-subtitle" style={{ marginBottom: 0 }}>
-            Vista previa de los datos dentro del archivo seleccionado
+            Vista previa de los datos ya limpios del archivo seleccionado
           </div>
         </div>
 
@@ -46,7 +53,7 @@ export default function RecordsTablePreview({ datasets, loading }: RecordsTableP
           <select
             className="input-field"
             value={activeId}
-            onChange={(e) => setSelectedId(e.target.value)}
+            onChange={(e) => onSelectId(e.target.value)}
             style={{ width: 'auto', minWidth: 200, padding: '8px 12px' }}
           >
             {datasets.map((d) => (

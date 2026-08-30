@@ -11,13 +11,22 @@ import UploadZone from '../components/dashboard/UploadZone'
 import EmptyState from '../components/dashboard/EmptyState'
 import DataCleaningPanel from '../components/dashboard/DataCleaningPanel'
 import SettingsPage from './SettingsPage'
+import VentasPage, { type VentasSubmodule } from './VentasPage'
 import { useDatasets } from '../lib/useDatasets'
-import { clearSession, getMyProfile, type Profile } from '../lib/api'
+import {
+  clearSession,
+  getMyProfile,
+  getAnalystPermissions,
+  DEFAULT_ANALYST_PERMISSIONS,
+  type Profile,
+  type AnalystPermissions,
+} from '../lib/api'
 
 const SECTION_META: Record<DashboardSection, { title: string; subtitle: string }> = {
   resumen: { title: 'Dashboard', subtitle: 'Vista general de tus datos procesados' },
   cargar: { title: 'Cargar datos', subtitle: 'Sube nuevos archivos a la plataforma' },
   explorar: { title: 'Limpieza de datos', subtitle: 'Revisa los conjuntos de datos cargados' },
+  ventas: { title: 'Ventas', subtitle: 'Ventas, clientes y comparación con otras farmacias' },
   reportes: { title: 'Reportes', subtitle: 'Descarga los resúmenes generados' },
   ajustes: { title: 'Ajustes', subtitle: 'Preferencias de tu cuenta y del panel' },
 }
@@ -37,6 +46,51 @@ export default function DashboardPage() {
   useEffect(() => {
     getMyProfile().then(setProfile).catch(() => { })
   }, [])
+
+  const isAnalyst = profile?.role === 'analyst'
+  const [permissions, setPermissions] = useState<AnalystPermissions>(DEFAULT_ANALYST_PERMISSIONS)
+
+  useEffect(() => {
+    // Tanto admin como analista consultan el mismo endpoint: el backend
+    // decide si devuelve los permisos propios (admin) o los de su admin
+    // dueño (analyst). Si falla (ej. analista aún sin admin asignado), se
+    // usan los valores por defecto para no romper la navegación.
+    getAnalystPermissions()
+      .then(setPermissions)
+      .catch(() => setPermissions(DEFAULT_ANALYST_PERMISSIONS))
+  }, [])
+
+  // El admin ve todo. El analista solo ve lo que el admin habilitó en
+  // Ajustes → Permisos del analista (además, el backend ya rechaza con
+  // 403 cualquier intento de subir/limpiar aunque alguien fuerce la URL).
+  const visibleSections: DashboardSection[] = isAnalyst
+    ? (['resumen', 'ventas', 'cargar', 'explorar', 'reportes', 'ajustes'] as DashboardSection[]).filter((key) => {
+      if (key === 'resumen' || key === 'ajustes') return true
+      if (key === 'ventas') return permissions.ventas
+      if (key === 'cargar') return permissions.cargar
+      if (key === 'explorar') return permissions.explorar
+      if (key === 'reportes') return permissions.reportes
+      return true
+    })
+    : (['resumen', 'cargar', 'explorar', 'ventas', 'reportes', 'ajustes'] as DashboardSection[])
+
+  const visibleVentasSubmodules: VentasSubmodule[] = isAnalyst
+    ? (
+      [
+        ['resumen', permissions.ventas_resumen],
+        ['clientes', permissions.ventas_clientes],
+        ['comparacion', permissions.ventas_comparacion],
+      ] as [VentasSubmodule, boolean][]
+    )
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key)
+    : (['resumen', 'clientes', 'comparacion'] as VentasSubmodule[])
+
+  // Si el analista está parado en una sección que le acaban de quitar,
+  // lo regresamos a "resumen" para que no vea una pantalla vacía.
+  useEffect(() => {
+    if (!visibleSections.includes(section)) setSection('resumen')
+  }, [section, visibleSections])
 
   const meta = SECTION_META[section]
 
@@ -82,6 +136,7 @@ export default function DashboardPage() {
         onToggleTheme={() => setIsLight((v) => !v)}
         userEmail={profile?.email}
         userName={profile?.full_name ?? undefined}
+        visibleSections={visibleSections}
         onLogout={() => {
           clearSession()
           navigate('/')
@@ -140,6 +195,10 @@ export default function DashboardPage() {
 
         {section === 'explorar' && <DataCleaningPanel datasets={datasets} loading={loading} onGoToUpload={() => setSection('cargar')} onCleaned={refresh} />}
 
+        {section === 'ventas' && (
+          <VentasPage datasets={datasets} visibleSubmodules={visibleVentasSubmodules} />
+        )}
+
         {section === 'reportes' && (
           <div className="report-grid">
             <EmptyState
@@ -151,7 +210,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {section === 'ajustes' && <SettingsPage isLight={isLight} onToggleTheme={() => setIsLight((v) => !v)} totalRows={stats?.totalRows ?? 0} totalFiles={stats?.totalFiles ?? 0} />}
+        {section === 'ajustes' && <SettingsPage isLight={isLight} onToggleTheme={() => setIsLight((v) => !v)} totalRows={stats?.totalRows ?? 0} totalFiles={stats?.totalFiles ?? 0} isAdmin={!isAnalyst} />}
       </DashboardLayout>
     </div>
   )

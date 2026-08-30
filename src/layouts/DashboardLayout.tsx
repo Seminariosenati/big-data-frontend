@@ -6,12 +6,13 @@ import {
   Table2,
   FileBarChart2,
   Settings,
+  TrendingUp,
   Sun,
   Moon,
   LogOut,
 } from 'lucide-react'
 
-export type DashboardSection = 'resumen' | 'cargar' | 'explorar' | 'reportes' | 'ajustes'
+export type DashboardSection = 'resumen' | 'cargar' | 'explorar' | 'ventas' | 'reportes' | 'ajustes'
 
 interface NavItem {
   key: DashboardSection
@@ -19,10 +20,11 @@ interface NavItem {
   icon: typeof LayoutDashboard
 }
 
-const NAV_ITEMS: NavItem[] = [
+const ALL_NAV_ITEMS: NavItem[] = [
   { key: 'resumen', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'cargar', label: 'Cargar datos', icon: UploadCloud },
   { key: 'explorar', label: 'Limpieza de datos', icon: Table2 },
+  { key: 'ventas', label: 'Ventas', icon: TrendingUp },
   { key: 'reportes', label: 'Reportes', icon: FileBarChart2 },
   { key: 'ajustes', label: 'Ajustes', icon: Settings },
 ]
@@ -38,6 +40,10 @@ interface DashboardLayoutProps {
   onLogout: () => void
   userEmail?: string
   userName?: string
+  /** Qué secciones se muestran en el menú. Si no se pasa, se muestran todas
+   * (comportamiento del admin). El analista recibe una lista filtrada según
+   * los permisos configurados en Ajustes. */
+  visibleSections?: DashboardSection[]
   children: ReactNode
 }
 
@@ -52,11 +58,17 @@ export default function DashboardLayout({
   onLogout,
   userEmail,
   userName,
+  visibleSections,
   children,
 }: DashboardLayoutProps) {
   const initials = userName
     ? userName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
     : (userEmail?.[0] ?? '?').toUpperCase()
+
+  const navItems = visibleSections
+    ? ALL_NAV_ITEMS.filter((item) => visibleSections.includes(item.key))
+    : ALL_NAV_ITEMS
+
   return (
     <div className="dash-shell">
       <aside className="dash-sidebar">
@@ -71,7 +83,7 @@ export default function DashboardLayout({
         </div>
 
         <nav className="dash-nav">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon
             return (
               <button

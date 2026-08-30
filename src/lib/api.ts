@@ -1,6 +1,38 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let refreshPromise: Promise<boolean> | null = null
+
+// Intenta renovar el access token usando el refresh token guardado.
+// Se comparte una sola promesa entre llamadas concurrentes para no
+// disparar varios /auth/refresh en paralelo si varios requests fallan
+// con 401 al mismo tiempo.
+async function tryRefreshSession(): Promise<boolean> {
+    const session = getSession()
+    if (!session) return false
+
+    if (!refreshPromise) {
+        refreshPromise = fetch(`${API_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: session.refresh_token }),
+        })
+            .then(async (res) => {
+                if (!res.ok) return false
+                const data = await res.json().catch(() => null)
+                if (!data?.session?.access_token || !data?.session?.refresh_token) return false
+                saveSession(data.session)
+                return true
+            })
+            .catch(() => false)
+            .finally(() => {
+                refreshPromise = null
+            })
+    }
+
+    return refreshPromise
+}
+
+async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
     const res = await fetch(`${API_URL}${path}`, {
         ...options,
         headers: {
@@ -8,6 +40,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
             ...options.headers,
         },
     })
+
+    if (res.status === 401 && !isRetry && getSession() && path !== '/auth/refresh') {
+        const refreshed = await tryRefreshSession()
+        if (refreshed) {
+            return request<T>(path, { ...options, headers: { ...options.headers, ...authHeaders() } }, true)
+        }
+        clearSession()
+    }
 
     const data = await res.json().catch(() => ({}))
 
@@ -257,6 +297,24 @@ export function getChartColumnDataForDataset(datasetId: string, column: string) 
     })
 }
 
+export interface SalesSummary {
+    sales_column: string
+    date_column: string | null
+    category_column: string | null
+    total_sales: number
+    avg_ticket: number
+    row_count: number
+    top_category: { name: string; total: number } | null
+    monthly: { month: string; total: number }[]
+    trend_pct: number | null
+}
+
+export function getSalesSummaryForDataset(datasetId: string) {
+    return request<SalesSummary>(`/datasets/${datasetId}/sales-summary`, {
+        headers: authHeaders(),
+    })
+}
+
 // Variantes "sin limpiar": usan el archivo tal como se subió (con nulos,
 // duplicados y valores mal formateados), para la pestaña de gráficos de
 // "Cargar datos".
@@ -269,5 +327,135 @@ export function getRawChartColumnsForDataset(datasetId: string) {
 export function getRawChartColumnDataForDataset(datasetId: string, column: string) {
     return request<ChartColumnData>(`/datasets/${datasetId}/charts/raw/data?column=${encodeURIComponent(column)}`, {
         headers: authHeaders(),
+    })
+}
+
+// ---------------------------------------------------------------------
+// Comparación con otra farmacia/botica (módulo Ventas)
+// El CSV que se sube aquí NUNCA se guarda: el backend lo lee en memoria,
+// lo compara contra tu dataset ya limpio, y descarta el archivo al
+// responder. No aparece en "Cargar datos" ni en ningún listado.
+// ---------------------------------------------------------------------
+export interface CompareRecommendation {
+    column: string
+    impact_pct: number | null
+    message: string
+}
+
+export interface CompareResult {
+    own_columns: string[]
+    other_columns: string[]
+    extra_columns: string[]
+    sales_column_detected: string | null
+    recommendations: CompareRecommendation[]
+    ownFileName: string
+    comparedFileName: string
+}
+
+export async function compareDataset(datasetId: string, file: File) {
+    const session = getSession()
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await fetch(`${API_URL}/datasets/${datasetId}/compare`, {
+        method: 'POST',
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body: formData,
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.detail || 'No se pudo comparar el archivo')
+    return data as CompareResult
+}
+
+// ---------------------------------------------------------------------
+// Permisos del rol "analyst" — qué secciones del panel puede ver.
+// Se guardan en el backend (tabla analyst_permissions), ligados al admin
+// dueño del sistema. Un analista los lee en modo solo lectura; el admin
+// puede editarlos y guardarlos.
+// ---------------------------------------------------------------------
+export interface AnalystPermissions {
+    ventas: boolean
+    ventas_resumen: boolean
+    ventas_clientes: boolean
+    ventas_comparacion: boolean
+    cargar: boolean
+    explorar: boolean
+    reportes: boolean
+}
+
+export const DEFAULT_ANALYST_PERMISSIONS: AnalystPermissions = {
+    ventas: true,
+    ventas_resumen: true,
+    ventas_clientes: true,
+    ventas_comparacion: true,
+    cargar: false,
+    explorar: false,
+    reportes: true,
+}
+
+export function getAnalystPermissions() {
+    return request<AnalystPermissions & { user_id: string }>('/settings/analyst-permissions', {
+        headers: authHeaders(),
+    })
+}
+
+// ---------------------------------------------------------------------
+// Gestión de cuentas de analista (solo admin). Cada analista tiene su
+// propia fila de permisos individuales.
+// ---------------------------------------------------------------------
+export interface Analyst {
+    id: string
+    full_name: string | null
+    email: string | null
+    phone: string | null
+    created_at: string
+    permissions: AnalystPermissions
+}
+
+export function listAnalysts() {
+    return request<Analyst[]>('/users', { headers: authHeaders() })
+}
+
+export function createAnalyst(input: { fullName: string; email: string; password: string }) {
+    return request<{ id: string; email: string; permissions: AnalystPermissions }>('/users', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(input),
+    })
+}
+
+export function updateAnalystPermissions(analystId: string, permissions: AnalystPermissions) {
+    return request<AnalystPermissions>(`/users/${analystId}/permissions`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify(permissions),
+    })
+}
+
+export function deleteAnalyst(analystId: string) {
+    return request<void>(`/users/${analystId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+    })
+}
+
+export interface AnalystDatasetAccess {
+    id: string
+    file_name: string
+    allowed: boolean
+}
+
+export function listAnalystDatasetAccess(analystId: string) {
+    return request<AnalystDatasetAccess[]>(`/users/${analystId}/datasets`, {
+        headers: authHeaders(),
+    })
+}
+
+export function updateAnalystDatasetAccess(analystId: string, datasetIds: string[]) {
+    return request<{ dataset_ids: string[] }>(`/users/${analystId}/datasets`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ dataset_ids: datasetIds }),
     })
 }

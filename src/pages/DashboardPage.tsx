@@ -13,6 +13,8 @@ import DataCleaningPanel from '../components/dashboard/DataCleaningPanel'
 import SettingsPage from './SettingsPage'
 import VentasPage, { type VentasSubmodule } from './VentasPage'
 import { useDatasets } from '../lib/useDatasets'
+import { ChartViewProvider } from '../lib/chartView'
+import ChartViewToggle from '../components/dashboard/ChartViewToggle'
 import {
   clearSession,
   getMyProfile,
@@ -126,22 +128,24 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div data-theme={isLight ? 'light' : 'dark'}>
-      <DashboardLayout
-        active={section}
-        onNavigate={setSection}
-        title={meta.title}
-        subtitle={meta.subtitle}
-        isLight={isLight}
-        onToggleTheme={() => setIsLight((v) => !v)}
-        userEmail={profile?.email}
-        userName={profile?.full_name ?? undefined}
-        visibleSections={visibleSections}
-        onLogout={() => {
-          clearSession()
-          navigate('/')
-        }}
-      >
+    <ChartViewProvider>
+      <div data-theme={isLight ? 'light' : 'dark'}>
+        <DashboardLayout
+          active={section}
+          onNavigate={setSection}
+          title={meta.title}
+          subtitle={meta.subtitle}
+          headerAction={<ChartViewToggle />}
+          isLight={isLight}
+          onToggleTheme={() => setIsLight((v) => !v)}
+          userEmail={profile?.email}
+          userName={profile?.full_name ?? undefined}
+          visibleSections={visibleSections}
+          onLogout={() => {
+            clearSession()
+            navigate('/')
+          }}
+        >
         {error && <div className="form-alert error">{error}</div>}
 
         {section === 'resumen' && (
@@ -212,6 +216,7 @@ export default function DashboardPage() {
 
         {section === 'ajustes' && <SettingsPage isLight={isLight} onToggleTheme={() => setIsLight((v) => !v)} totalRows={stats?.totalRows ?? 0} totalFiles={stats?.totalFiles ?? 0} isAdmin={!isAnalyst} />}
       </DashboardLayout>
-    </div>
+      </div>
+    </ChartViewProvider>
   )
 }

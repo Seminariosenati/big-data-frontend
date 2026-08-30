@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getChartColumnsForDataset, getChartColumnDataForDataset, type ChartColumn, type ChartColumnData, type Dataset } from '../../lib/api'
+import ColumnChart from './ColumnChart'
 
 interface CleanedDataChartCardProps {
   datasets: Dataset[]

@@ -1,4 +1,17 @@
+import { useMemo } from 'react'
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import type { Dataset } from '../../lib/api'
+import { useChartView } from '../../lib/chartView'
 
 interface BarChartCardProps {
   datasets: Dataset[]
@@ -27,25 +40,57 @@ function buildMonthlyVolume(datasets: Dataset[]) {
   return months
 }
 
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value?: number }>; label?: string }) {
+  if (!active || !payload || payload.length === 0) return null
+  const value = payload[0]?.value ?? 0
+  return (
+    <div className="sales-area-tooltip">
+      <span className="sales-area-tooltip-dot" />
+      <strong>{label}: {value.toLocaleString('es-PE')}</strong>
+    </div>
+  )
+}
+
 export default function BarChartCard({ datasets }: BarChartCardProps) {
-  const monthlyVolume = buildMonthlyVolume(datasets)
-  const max = Math.max(1, ...monthlyVolume.map((m) => m.value))
+  const monthlyVolume = useMemo(() => buildMonthlyVolume(datasets), [datasets])
+  const { view } = useChartView()
 
   return (
     <div className="panel-card">
       <div className="panel-title">Volumen de registros procesados</div>
       <div className="panel-subtitle">Últimos 7 meses</div>
-      <div className="bar-chart">
-        {monthlyVolume.map((m) => (
-          <div className="bar-chart-col" key={m.key}>
-            <div
-              className="bar-chart-bar"
-              style={{ height: `${(m.value / max) * 100}%` }}
-              title={`${m.label}: ${m.value.toLocaleString('es-PE')} registros`}
-            />
-            <span className="bar-chart-label">{m.label}</span>
-          </div>
-        ))}
+      <div className="sales-area-chart">
+        <ResponsiveContainer width="100%" height={230}>
+          {view === 'bar' ? (
+            <BarChart data={monthlyVolume} margin={{ top: 12, right: 6, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="volBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.9} />
+                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.25} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: 'var(--text-faint)', fontSize: 11 }} axisLine={false} tickLine={false} dy={6} />
+              <YAxis tick={{ fill: 'var(--text-faint)', fontSize: 11 }} axisLine={false} tickLine={false} width={56} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--border-soft)' }} />
+              <Bar dataKey="value" fill="url(#volBarGradient)" radius={[4, 4, 0, 0]} maxBarSize={34} />
+            </BarChart>
+          ) : (
+            <AreaChart data={monthlyVolume} margin={{ top: 12, right: 6, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="volAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: 'var(--text-faint)', fontSize: 11 }} axisLine={false} tickLine={false} dy={6} />
+              <YAxis tick={{ fill: 'var(--text-faint)', fontSize: 11 }} axisLine={false} tickLine={false} width={56} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} />
+              <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#27272a', strokeDasharray: '3 3' }} />
+              <Area type="natural" dataKey="value" stroke="var(--primary)" strokeWidth={2.5} fill="url(#volAreaGradient)" dot={{ r: 3, fill: 'var(--primary)', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+            </AreaChart>
+          )}
+        </ResponsiveContainer>
       </div>
     </div>
   )

@@ -36,7 +36,6 @@ export default function UsersSection() {
     const [step, setStep] = useState<FormStep>('form')
     const [form, setForm] = useState({ fullName: '', email: '', password: '' })
     const [otpCode, setOtpCode] = useState('')
-    const [otpEmail, setOtpEmail] = useState('')
     const [creating, setCreating] = useState(false)
     const [verifying, setVerifying] = useState(false)
     const [resending, setResending] = useState(false)
@@ -56,7 +55,6 @@ export default function UsersSection() {
     const resetForm = () => {
         setForm({ fullName: '', email: '', password: '' })
         setOtpCode('')
-        setOtpEmail('')
         setStep('form')
         setRole('analyst')
     }
@@ -69,7 +67,6 @@ export default function UsersSection() {
         try {
             if (role === 'admin') {
                 const res = await requestCreateAdmin(form)
-                setOtpEmail(res.email)
                 setStep('otp')
                 setInfo(`Te enviamos un código de verificación a ${res.email} para confirmar la creación.`)
             } else {

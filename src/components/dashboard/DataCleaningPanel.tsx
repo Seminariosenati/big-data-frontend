@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Download, FileSpreadsheet, FilterX, History, RefreshCw, Trash2, WandSparkles } from 'lucide-react'
+import { CheckCircle2, Download, FileSpreadsheet, FilterX, History, Table2, Activity, Trash2, WandSparkles } from 'lucide-react'
 import type { CleaningOptions, Dataset, DatasetPreview } from '../../lib/api'
 import { applyCleanDataset, getDatasetPreview, previewCleanDataset } from '../../lib/api'
 import CleaningHistoryModal from './CleaningHistoryModal'
+import CleaningModal, { type CleaningStatus } from './CleaningModal'
+import HealthScoreRing from './HealthScoreRing'
 
 interface DataCleaningPanelProps {
   datasets: Dataset[]
@@ -37,8 +39,12 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
   const [afterLoading, setAfterLoading] = useState(false)
   const [options, setOptions] = useState<CleaningOptions>(DEFAULT_OPTIONS)
   const [applying, setApplying] = useState(false)
-  const [applied, setApplied] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [cleanModal, setCleanModal] = useState<{ status: CleaningStatus; progress: number } | null>(null)
+  const [cleanError, setCleanError] = useState<string | null>(null)
+  const [cleanSummary, setCleanSummary] = useState<DatasetPreview['summary']>(undefined)
+  const [rightTab, setRightTab] = useState<'preview' | 'health'>('preview')
+  const [previewMode, setPreviewMode] = useState<'original' | 'cleaned'>('cleaned')
 
   const selected = datasets.find((d) => d.id === selectedId) ?? datasets[0]
   const setOption = <K extends keyof CleaningOptions>(key: K, value: CleaningOptions[K]) =>
@@ -51,7 +57,7 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
     setOptions(DEFAULT_OPTIONS)
     setBeforePreview(null)
     setAfterPreview(null)
-    setApplied(false)
+    setCleanModal(null)
     setPreviewLoading(true)
     getDatasetPreview(selected.id)
       .then((result) => { setBeforePreview(result); setAfterPreview(result) })
@@ -62,7 +68,7 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
   // Cambio de opciones: pedirle al backend el resultado real (debounced).
   useEffect(() => {
     if (!selected) return
-    setApplied(false)
+    setCleanModal(null)
     if (JSON.stringify(options) === JSON.stringify(DEFAULT_OPTIONS)) {
       if (beforePreview) setAfterPreview(beforePreview)
       return
@@ -84,20 +90,81 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
     return Math.round(Math.min(100, score))
   }, [options, selected])
 
+  const qualityMetrics = useMemo(() => {
+    const rowCount = selected?.row_count ?? 0
+    const colCount = selected?.column_count ?? 0
+    const nulls = selected?.null_count ?? 0
+    const dups = selected?.duplicate_count ?? 0
+
+    const dupPct = rowCount > 0 ? (dups / rowCount) * 100 : 0
+    const nullPct = rowCount > 0 && colCount > 0 ? (nulls / (rowCount * colCount)) * 100 : 0
+    const cells = rowCount * colCount
+    const cleanCells = cells > 0 ? cells - nulls : 0
+    const coveragePct = cells > 0 ? (cleanCells / cells) * 100 : 0
+
+    const dateColumns = (selected?.columns_summary ?? []).filter((c) =>
+      /date|datetime|timestamp/i.test(c.dtype)
+    )
+    const hasDates = dateColumns.length > 0
+    const dateAvgNullPct = dateColumns.length > 0
+      ? dateColumns.reduce((sum, c) => sum + (c.null_pct ?? 0), 0) / dateColumns.length
+      : 0
+
+    return {
+      dupPct,
+      nullPct,
+      coveragePct,
+      hasDates,
+      dateAvgNullPct,
+      dateStatus: !hasDates
+        ? 'Sin columnas de fecha detectadas'
+        : dateAvgNullPct > 5
+          ? 'Requiere revisión'
+          : 'Formato correcto',
+      dateOk: !hasDates || dateAvgNullPct <= 5,
+    }
+  }, [selected])
+
+  const cleanedCounts = useMemo(() => {
+    const s = afterPreview?.summary
+    return {
+      duplicates: s?.duplicatesRemoved ?? 0,
+      emptyRows: s?.emptyRowsRemoved ?? 0,
+      nulls: s?.nullsFilled ?? 0,
+      columns: s?.columnsRemoved.length ?? 0,
+    }
+  }, [afterPreview])
+
   const applyCleaning = async () => {
     if (!selected) return
     setApplying(true)
+    setCleanError(null)
+    setCleanSummary(undefined)
+    setCleanModal({ status: 'processing', progress: 0 })
+
+    // Simula el avance de la barra mientras la API responde. La API resuelve
+    // de una sola vez, así que el progreso es informativo: sube hasta ~90% y
+    // el 100% se asigna recién cuando termina de verdad.
+    let progress = 0
+    const ticker = window.setInterval(() => {
+      progress = Math.min(90, progress + 8 + Math.round(Math.random() * 10))
+      setCleanModal((m) => (m && m.status === 'processing' ? { ...m, progress } : m))
+    }, 260)
+
     try {
-      setAfterPreview(await applyCleanDataset(selected.id, options))
-      setApplied(true)
-      // El backend ya recalculó calidad/estado (queda "Procesado" en vez de
-      // seguir mostrando el valor de antes de limpiar); refrescamos la lista
-      // del padre para que la tabla y el resto del dashboard lo reflejen ya,
-      // sin que el usuario tenga que recargar la página.
+      const result = await applyCleanDataset(selected.id, options)
+      window.clearInterval(ticker)
+      setAfterPreview(result)
+      setCleanSummary(result.summary)
+      setCleanModal({ status: 'success', progress: 100 })
+      setApplying(false)
+      // El backend ya recalculó calidad/estado; refrescamos la lista del padre
+      // para que la tabla y el resto del dashboard lo reflejen ya.
       onCleaned?.()
-    } catch {
-      // el fallo se refleja en que applied se queda en false
-    } finally {
+    } catch (err) {
+      window.clearInterval(ticker)
+      setCleanError(err instanceof Error ? err.message : 'No se pudo aplicar la limpieza')
+      setCleanModal({ status: 'error', progress })
       setApplying(false)
     }
   }
@@ -167,41 +234,147 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
               <input type="checkbox" checked={options.remove_empty_columns} onChange={(e) => setOption('remove_empty_columns', e.target.checked)} />
               <span><strong>Eliminar columnas vacías o irrelevantes</strong><small>Quita campos sin información útil</small></span>
             </label>
-            <button className="btn btn-primary btn-block cleaning-apply" onClick={applyCleaning} disabled={applying}>
+            <button className="btn btn-primary btn-block cleaning-apply" onClick={applyCleaning} disabled={applying || cleanModal?.status === 'processing'}>
               <WandSparkles size={16} /> {applying ? 'Aplicando…' : 'Aplicar limpieza'}
             </button>
             <button className="btn btn-ghost btn-block" onClick={() => setHistoryOpen(true)}>
               <History size={15} /> Ver historial de limpieza
             </button>
-            {applied && <div className="cleaning-confirm"><CheckCircle2 size={15} /> Cambios aplicados y guardados. Lo que se quitó quedó en el log, no se borró.</div>}
           </section>
 
-          <section className="cleaning-health panel-card">
-            <div className="cleaning-health-head"><div><div className="panel-title">Salud de datos</div><div className="panel-subtitle">Score estimado según las acciones seleccionadas</div></div><strong>{healthScore}<small>/100</small></strong></div>
-            <div className="health-meter"><span style={{ width: `${healthScore}%` }} /></div>
-            <div className="health-meta"><span>Antes <b>{selected.quality_score}%</b></span><span>Después <b className="health-after">{healthScore}%</b></span></div>
-            {afterPreview?.summary && (
-              <div className="cleaning-summary">
-                {afterPreview.summary.duplicatesRemoved > 0 && <span>{afterPreview.summary.duplicatesRemoved} duplicados</span>}
-                {afterPreview.summary.emptyRowsRemoved > 0 && <span>{afterPreview.summary.emptyRowsRemoved} filas vacías</span>}
-                {afterPreview.summary.nullsFilled > 0 && <span>{afterPreview.summary.nullsFilled} nulos afectados</span>}
-                {afterPreview.summary.columnsRemoved.length > 0 && <span>{afterPreview.summary.columnsRemoved.length} columnas quitadas</span>}
-              </div>
-            )}
-            <div className="cleaning-preview-title"><span>Vista previa {afterPreview && afterPreview !== beforePreview && <small>· resaltado = cambió</small>}</span><button className="icon-button" title="Recargar vista previa" onClick={() => selected && setSelectedId('')}><RefreshCw size={15} /></button></div>
-            <div className="preview-labels"><span>ANTES</span><span>DESPUÉS {afterLoading && '· calculando…'}</span></div>
-            <div className="preview-compare">
-              <PreviewTable preview={beforePreview} loading={previewLoading} />
-              <PreviewTable preview={afterPreview} loading={previewLoading || afterLoading} diffAgainst={beforePreview} />
+          <section className="cleaning-health panel-card cleaning-right-card">
+            <div className="cleaning-tabs">
+              <button
+                type="button"
+                className={`cleaning-tab ${rightTab === 'preview' ? 'active' : ''}`}
+                onClick={() => setRightTab('preview')}
+              >
+                <Table2 size={15} /> Vista Previa de Datos
+              </button>
+              <button
+                type="button"
+                className={`cleaning-tab ${rightTab === 'health' ? 'active' : ''}`}
+                onClick={() => setRightTab('health')}
+              >
+                <Activity size={15} /> Diagnóstico de Salud
+              </button>
             </div>
-            <button className="btn btn-outline btn-block" disabled={!afterPreview?.rows.length} onClick={() => downloadCsv(afterPreview, selected.file_name)}><Download size={15} /> Descargar CSV limpio</button>
-            <button className="btn btn-ghost btn-block" disabled={!afterPreview?.rows.length} onClick={() => downloadCsv(afterPreview, selected.file_name.replace(/\.[^.]+$/, '.xlsx'))}>Descargar Excel limpio</button>
+
+            <div className="cleaning-tab-body">
+              {rightTab === 'preview' ? (
+                <div className="cleaning-preview-tab">
+                  <div className="cleaning-mode-toggle" role="group" aria-label="Modo de vista previa">
+                    <button
+                      type="button"
+                      className={`preview-mode-btn ${previewMode === 'original' ? 'active' : ''}`}
+                      onClick={() => setPreviewMode('original')}
+                    >
+                      Original (Antes)
+                    </button>
+                    <button
+                      type="button"
+                      className={`preview-mode-btn ${previewMode === 'cleaned' ? 'active' : ''}`}
+                      onClick={() => setPreviewMode('cleaned')}
+                    >
+                      Limpio (Después)
+                      {afterLoading && <span className="preview-mode-dot" />}
+                    </button>
+                  </div>
+
+                  <div className="preview-table-wrap preview-table-full">
+                    {previewMode === 'original' ? (
+                      <FullPreviewTable preview={beforePreview} loading={previewLoading} />
+                    ) : (
+                      <FullPreviewTable preview={afterPreview} loading={previewLoading || afterLoading} diffAgainst={previewMode === 'cleaned' ? beforePreview : null} />
+                    )}
+                  </div>
+
+                  {(previewMode === 'cleaned' && (cleanedCounts.duplicates > 0 || cleanedCounts.emptyRows > 0 || cleanedCounts.nulls > 0 || cleanedCounts.columns > 0)) && (
+                    <div className="cleaning-summary">
+                      {cleanedCounts.duplicates > 0 && <span>{cleanedCounts.duplicates} duplicados</span>}
+                      {cleanedCounts.emptyRows > 0 && <span>{cleanedCounts.emptyRows} filas vacías</span>}
+                      {cleanedCounts.nulls > 0 && <span>{cleanedCounts.nulls} nulos</span>}
+                      {cleanedCounts.columns > 0 && <span>{cleanedCounts.columns} columnas</span>}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="cleaning-health-tab">
+                  <div className="health-ring-wrap">
+                    <HealthScoreRing score={healthScore} />
+                    <div className="health-ring-caption">
+                      <strong>{healthScore}<small>/100</small></strong>
+                      <span>{healthScore >= 80 ? 'Datos saludables' : healthScore >= 50 ? 'Mejorable' : 'Requiere atención'}</span>
+                    </div>
+                  </div>
+
+                  <div className="health-metric-grid">
+                    <div className="health-metric">
+                      <div className="health-metric-label">
+                        <span>Filas duplicadas</span>
+                        <strong>{qualityMetrics.dupPct.toFixed(1)}%</strong>
+                      </div>
+                      <div className="health-metric-bar">
+                        <span className={`health-metric-fill ${qualityMetrics.dupPct <= 1 ? 'ok' : qualityMetrics.dupPct < 5 ? 'warn' : 'bad'}`} style={{ width: `${Math.min(100, qualityMetrics.dupPct * 3)}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="health-metric">
+                      <div className="health-metric-label">
+                        <span>Valores nulos detectados</span>
+                        <strong>{qualityMetrics.nullPct.toFixed(1)}%</strong>
+                      </div>
+                      <div className="health-metric-bar">
+                        <span className={`health-metric-fill ${qualityMetrics.nullPct <= 2 ? 'ok' : qualityMetrics.nullPct < 8 ? 'warn' : 'bad'}`} style={{ width: `${Math.min(100, qualityMetrics.nullPct * 3)}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="health-metric">
+                      <div className="health-metric-label">
+                        <span>Cobertura de celdas</span>
+                        <strong>{qualityMetrics.coveragePct.toFixed(1)}%</strong>
+                      </div>
+                      <div className="health-metric-bar">
+                        <span className={`health-metric-fill healthy ${qualityMetrics.coveragePct >= 98 ? 'ok' : qualityMetrics.coveragePct >= 92 ? 'warn' : 'bad'}`} style={{ width: `${qualityMetrics.coveragePct}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="health-metric">
+                      <div className="health-metric-label">
+                        <span>Formato de fechas</span>
+                        <strong>{qualityMetrics.dateStatus}</strong>
+                      </div>
+                      <div className="health-metric-bar health-metric-bar-static">
+                        <span className={`health-metric-fill ${qualityMetrics.dateOk ? 'ok' : 'bad'}`} style={{ width: qualityMetrics.dateOk ? '100%' : '35%' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="cleaning-export-bar">
+              <button className="btn btn-outline" disabled={!afterPreview?.rows.length} onClick={() => downloadCsv(afterPreview, selected.file_name)}><Download size={15} /> Descargar CSV limpio</button>
+              <button className="btn btn-ghost" disabled={!afterPreview?.rows.length} onClick={() => downloadCsv(afterPreview, selected.file_name.replace(/\.[^.]+$/, '.xlsx'))}>Descargar Excel limpio</button>
+            </div>
           </section>
         </div>
       )}
 
       {historyOpen && (
         <CleaningHistoryModal datasets={datasets} onClose={() => setHistoryOpen(false)} />
+      )}
+
+      {cleanModal && (
+        <CleaningModal
+          status={cleanModal.status}
+          progress={cleanModal.progress}
+          fileName={selected?.file_name ?? ''}
+          summary={cleanSummary}
+          errorMessage={cleanError ?? undefined}
+          onViewDataset={() => setCleanModal(null)}
+          onClose={() => setCleanModal(null)}
+        />
       )}
     </div>
   )
@@ -211,20 +384,22 @@ function cellText(value: unknown) {
   return value === null || value === undefined || value === '' ? '—' : String(value)
 }
 
-/** Tabla de preview. Si recibe `diffAgainst`, resalta las celdas cuyo valor
- * cambió respecto a esa otra preview (misma fila/columna), para que "poner
- * null" o cualquier otro cambio se vea aunque el texto renderizado ("—")
- * sea igual en ambos casos. */
-function PreviewTable({ preview, loading, diffAgainst }: { preview: DatasetPreview | null; loading: boolean; diffAgainst?: DatasetPreview | null }) {
+/** Tabla de preview a ancho completo. Si recibe `diffAgainst`, resalta las
+ * celdas cuyo valor cambió respecto a esa otra preview (misma fila/columna),
+ * para que la limpieza se vea clara aunque el texto renderizado ("—") sea
+ * igual en ambos casos. */
+function FullPreviewTable({ preview, loading, diffAgainst }: { preview: DatasetPreview | null; loading: boolean; diffAgainst?: DatasetPreview | null }) {
   if (loading) return <div className="preview-empty">Cargando…</div>
-  if (!preview) return <div className="preview-empty">Sin vista previa disponible</div>
-  const columns = preview.columns.slice(0, 4)
+  if (!preview || preview.columns.length === 0) return <div className="preview-empty">Sin vista previa disponible</div>
+  const columns = preview.columns
   return (
-    <div className="preview-table-wrap">
+    <div className="preview-table-scroll">
       <table className="data-table">
-        <thead><tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+        <thead>
+          <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
+        </thead>
         <tbody>
-          {preview.rows.slice(0, 3).map((row, i) => (
+          {preview.rows.map((row, i) => (
             <tr key={i}>
               {columns.map((c) => {
                 const before = diffAgainst?.rows[i]?.[c]

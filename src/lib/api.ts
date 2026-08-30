@@ -425,6 +425,35 @@ export function createAnalyst(input: { fullName: string; email: string; password
     })
 }
 
+// ---------------------------------------------------------------------
+// Creación de cuentas ADMIN (solo admin). Es un flujo de 2 pasos porque
+// el rol es fuerte: primero se pide un código de verificación (llega al
+// correo del admin que hace la acción), y recién al confirmarlo se crea
+// la cuenta nueva.
+// ---------------------------------------------------------------------
+export function requestCreateAdmin(input: { fullName: string; email: string; password: string }) {
+    return request<{ message: string; email: string; requiresOtp: true }>('/users/admins/request', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(input),
+    })
+}
+
+export function verifyCreateAdmin(input: { code: string }) {
+    return request<{ message: string; id: string; email: string }>('/users/admins/verify', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(input),
+    })
+}
+
+export function resendCreateAdminOtp() {
+    return request<{ message: string }>('/users/admins/resend', {
+        method: 'POST',
+        headers: authHeaders(),
+    })
+}
+
 export function updateAnalystPermissions(analystId: string, permissions: AnalystPermissions) {
     return request<AnalystPermissions>(`/users/${analystId}/permissions`, {
         method: 'PUT',

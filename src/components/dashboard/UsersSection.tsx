@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Database, Loader2, Trash2, UserPlus, Users } from 'lucide-react'
+import { Database, Loader2, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react'
 import {
     createAnalyst,
     deleteAnalyst,
     listAnalysts,
     listAnalystDatasetAccess,
+    requestCreateAdmin,
+    resendCreateAdminOtp,
     updateAnalystDatasetAccess,
     updateAnalystPermissions,
+    verifyCreateAdmin,
     type Analyst,
     type AnalystDatasetAccess,
     type AnalystPermissions,
@@ -22,13 +25,23 @@ const PERMISSION_LABELS: { key: keyof AnalystPermissions; label: string }[] = [
     { key: 'reportes', label: 'Reportes' },
 ]
 
+type Role = 'analyst' | 'admin'
+type FormStep = 'form' | 'otp'
+
 export default function UsersSection() {
     const [analysts, setAnalysts] = useState<Analyst[]>([])
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
+    const [role, setRole] = useState<Role>('analyst')
+    const [step, setStep] = useState<FormStep>('form')
     const [form, setForm] = useState({ fullName: '', email: '', password: '' })
+    const [otpCode, setOtpCode] = useState('')
+    const [otpEmail, setOtpEmail] = useState('')
     const [creating, setCreating] = useState(false)
+    const [verifying, setVerifying] = useState(false)
+    const [resending, setResending] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [info, setInfo] = useState<string | null>(null)
 
     const load = () => {
         setLoading(true)
@@ -40,19 +53,64 @@ export default function UsersSection() {
 
     useEffect(load, [])
 
+    const resetForm = () => {
+        setForm({ fullName: '', email: '', password: '' })
+        setOtpCode('')
+        setOtpEmail('')
+        setStep('form')
+        setRole('analyst')
+    }
+
     const handleCreate = async (event: React.FormEvent) => {
         event.preventDefault()
         setCreating(true)
         setError(null)
+        setInfo(null)
         try {
-            await createAnalyst(form)
-            setForm({ fullName: '', email: '', password: '' })
-            setShowForm(false)
-            load()
+            if (role === 'admin') {
+                const res = await requestCreateAdmin(form)
+                setOtpEmail(res.email)
+                setStep('otp')
+                setInfo(`Te enviamos un código de verificación a ${res.email} para confirmar la creación.`)
+            } else {
+                await createAnalyst(form)
+                resetForm()
+                setShowForm(false)
+                load()
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta')
         } finally {
             setCreating(false)
+        }
+    }
+
+    const handleVerifyAdminOtp = async (event: React.FormEvent) => {
+        event.preventDefault()
+        setVerifying(true)
+        setError(null)
+        try {
+            await verifyCreateAdmin({ code: otpCode })
+            setInfo('Cuenta de administrador creada correctamente.')
+            resetForm()
+            setShowForm(false)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Código incorrecto')
+        } finally {
+            setVerifying(false)
+        }
+    }
+
+    const handleResendAdminOtp = async () => {
+        setError(null)
+        setResending(true)
+        try {
+            await resendCreateAdminOtp()
+            setInfo('Reenviamos el código a tu correo.')
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'No se pudo reenviar el código')
+        } finally {
+            setResending(false)
         }
     }
 
@@ -84,12 +142,13 @@ export default function UsersSection() {
             <div className="settings-section-heading">
                 <div>
                     <div className="panel-title">Usuarios</div>
-                    <div className="panel-subtitle">Crea cuentas de analista y controla a qué secciones puede acceder cada una.</div>
+                    <div className="panel-subtitle">Crea cuentas de analista o de administrador y controla a qué secciones puede acceder cada analista.</div>
                 </div>
                 <Users size={19} className="settings-heading-icon" />
             </div>
 
             {error && <div className="form-alert error">{error}</div>}
+            {info && !error && <div className="form-alert">{info}</div>}
 
             {loading ? (
                 <div className="settings-row-hint"><Loader2 size={15} className="spin" /> Cargando analistas…</div>
@@ -130,8 +189,50 @@ export default function UsersSection() {
                 </div>
             )}
 
-            {showForm ? (
+            {showForm && step === 'otp' ? (
+                <form className="settings-form-grid" style={{ marginTop: 16 }} onSubmit={handleVerifyAdminOtp}>
+                    <label className="settings-input">
+                        <span>Código de verificación</span>
+                        <input
+                            inputMode="numeric"
+                            maxLength={6}
+                            required
+                            autoFocus
+                            placeholder="123456"
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                        />
+                    </label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' }}>
+                        <button type="submit" className="btn btn-primary" disabled={verifying}>
+                            {verifying ? 'Verificando…' : 'Confirmar y crear administrador'}
+                        </button>
+                        <button type="button" className="link-btn" onClick={handleResendAdminOtp} disabled={resending}>
+                            {resending ? 'Reenviando…' : 'Reenviar código'}
+                        </button>
+                        <button type="button" className="btn btn-outline" onClick={() => setStep('form')}>
+                            Volver
+                        </button>
+                    </div>
+                </form>
+            ) : showForm ? (
                 <form className="settings-form-grid" style={{ marginTop: 16 }} onSubmit={handleCreate}>
+                    <div className="auth-tabs" style={{ maxWidth: 320, gridColumn: '1 / -1', marginBottom: 4 }}>
+                        <button type="button" className={`auth-tab ${role === 'analyst' ? 'active' : ''}`} onClick={() => setRole('analyst')}>
+                            Analista
+                        </button>
+                        <button type="button" className={`auth-tab ${role === 'admin' ? 'active' : ''}`} onClick={() => setRole('admin')}>
+                            Administrador
+                        </button>
+                    </div>
+
+                    {role === 'admin' && (
+                        <div className="settings-row-hint" style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                            <ShieldCheck size={14} style={{ marginTop: 2, flexShrink: 0 }} />
+                            Los administradores tienen acceso completo a la plataforma. Antes de crear la cuenta te pediremos un código de verificación enviado a tu correo.
+                        </div>
+                    )}
+
                     <label className="settings-input">
                         <span>Nombre completo</span>
                         <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required />
@@ -146,14 +247,14 @@ export default function UsersSection() {
                     </label>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
                         <button type="submit" className="btn btn-primary" disabled={creating}>
-                            {creating ? 'Creando…' : 'Crear analista'}
+                            {creating ? 'Creando…' : role === 'admin' ? 'Enviar código de verificación' : 'Crear analista'}
                         </button>
-                        <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>Cancelar</button>
+                        <button type="button" className="btn btn-outline" onClick={() => { setShowForm(false); resetForm() }}>Cancelar</button>
                     </div>
                 </form>
             ) : (
-                <button type="button" className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => setShowForm(true)}>
-                    <UserPlus size={15} /> Crear analista
+                <button type="button" className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setError(null); setInfo(null); setShowForm(true) }}>
+                    <UserPlus size={15} /> Crear usuario
                 </button>
             )}
         </section>

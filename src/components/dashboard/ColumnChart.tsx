@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { useChartView } from '../../lib/chartView'
+import { useChartView } from '../../lib/chartViewContext'
 import type { ChartColumnData } from '../../lib/api'
 
 function formatEdge(n: number) {

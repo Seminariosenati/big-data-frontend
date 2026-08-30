@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { Dataset } from '../../lib/api'
-import { useChartView } from '../../lib/chartView'
+import { useChartView } from '../../lib/chartViewContext'
 
 interface BarChartCardProps {
   datasets: Dataset[]

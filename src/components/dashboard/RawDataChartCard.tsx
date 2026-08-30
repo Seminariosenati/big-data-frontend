@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getRawChartColumnsForDataset, getRawChartColumnDataForDataset, type ChartColumn, type ChartColumnData, type Dataset } from '../../lib/api'
+import ColumnChart from './ColumnChart'
 
 interface RawDataChartCardProps {
     datasets: Dataset[]
@@ -45,23 +46,6 @@ export default function RawDataChartCard({ datasets }: RawDataChartCardProps) {
             .catch((err) => setError(err instanceof Error ? err.message : 'No se pudieron cargar los datos'))
             .finally(() => setLoadingData(false))
     }, [activeId, selectedColumn])
-
-    const max = Math.max(1, ...(chartData?.data.map((d) => d.value) ?? [0]))
-
-    function formatEdge(n: number) {
-        const rounded = Math.round(n * 100) / 100
-        return rounded.toLocaleString('es-PE', { maximumFractionDigits: Number.isInteger(rounded) ? 0 : 2 })
-    }
-
-    function formatLabel(label: string, type?: 'numeric' | 'categorical') {
-        if (type !== 'numeric') return { top: label, bottom: null as string | null }
-        const parts = label.split('–').map((p) => p.trim())
-        if (parts.length !== 2) return { top: label, bottom: null }
-        const a = Number(parts[0])
-        const b = Number(parts[1])
-        if (Number.isNaN(a) || Number.isNaN(b)) return { top: label, bottom: null }
-        return { top: formatEdge(a), bottom: formatEdge(b) }
-    }
 
     if (datasets.length === 0) {
         return (
@@ -134,30 +118,7 @@ export default function RawDataChartCard({ datasets }: RawDataChartCardProps) {
                     )}
 
                     {!loadingData && chartData && chartData.data.length > 0 && (
-                        <div className="bar-chart" style={{ minWidth: chartData.data.length * 84 }}>
-                            {chartData.data.map((d) => {
-                                const { top, bottom } = formatLabel(d.label, chartData.type)
-                                const heightPct = Math.max((d.value / max) * 100, d.value > 0 ? 3 : 0)
-                                return (
-                                    <div className="bar-chart-col" key={d.label}>
-                                        <span className="bar-chart-value">{d.value.toLocaleString('es-PE')}</span>
-                                        <div
-                                            className="bar-chart-bar bar-chart-bar-single"
-                                            style={{ height: `${heightPct}%` }}
-                                            title={chartData.type === 'numeric' ? `${d.label}: ${d.value.toLocaleString('es-PE')} registros` : `${d.label}: ${d.value.toLocaleString('es-PE')}`}
-                                        />
-                                        <span className="bar-chart-label" title={d.label}>
-                                            {top}
-                                            {bottom != null && (
-                                                <>
-                                                    <br />– {bottom}
-                                                </>
-                                            )}
-                                        </span>
-                                    </div>
-                                )
-                            })}
-                        </div>
+                        <ColumnChart chartData={chartData} />
                     )}
                 </div>
             )}

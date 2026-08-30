@@ -13,7 +13,7 @@ import DataCleaningPanel from '../components/dashboard/DataCleaningPanel'
 import SettingsPage from './SettingsPage'
 import VentasPage, { type VentasSubmodule } from './VentasPage'
 import { useDatasets } from '../lib/useDatasets'
-import { ChartViewProvider } from '../lib/chartView'
+import { ChartViewProvider } from '../lib/ChartViewProvider'
 import ChartViewToggle from '../components/dashboard/ChartViewToggle'
 import {
   clearSession,

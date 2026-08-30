@@ -1498,6 +1498,62 @@ a {
   background: linear-gradient(180deg, var(--danger), rgba(244, 93, 93, 0.3)) !important;
 }
 
+/* Cabecera del card de ventas por mes + badge "Mejor mes vs. Promedio" */
+.sales-monthly-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.sales-best-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sales-best-badge strong {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--success);
+}
+
+/* Barras con valor visible encima */
+.bar-chart-with-values {
+  padding-top: 0;
+}
+
+.bar-chart-with-values .bar-chart-value {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.bar-chart-with-values .bar-chart-value.sales-best {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.bar-chart-with-values .bar-chart-value.sales-worst {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+@media (max-width: 620px) {
+  .sales-monthly-head {
+    flex-direction: column;
+  }
+}
+
 .bar-chart-value {
   font-size: 12px;
   font-weight: 600;

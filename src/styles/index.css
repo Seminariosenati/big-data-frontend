@@ -1554,6 +1554,83 @@ a {
   }
 }
 
+/* Area chart — Evolución de Ventas */
+.sales-area-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.sales-area-pills {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 3px;
+  flex-wrap: wrap;
+}
+
+.sales-area-pill {
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sales-area-pill:hover {
+  color: var(--text-main);
+}
+
+.sales-area-pill.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.sales-area-chart {
+  width: 100%;
+}
+
+.sales-area-tooltip {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-panel);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.sales-area-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+}
+
+.sales-area-tooltip strong {
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+@media (max-width: 620px) {
+  .sales-area-head {
+    flex-direction: column;
+  }
+}
+
 .bar-chart-value {
   font-size: 12px;
   font-weight: 600;

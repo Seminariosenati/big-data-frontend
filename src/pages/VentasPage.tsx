@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { TrendingUp, Users, GitCompareArrows, UploadCloud, Loader2, DollarSign, Receipt, Award, ArrowUpRight, ArrowDownRight } from 'lucide-react'
-import SalesByMonthCard from '../components/dashboard/SalesByMonthCard'
+import SalesAreaChart from '../components/dashboard/SalesAreaChart'
 import CleanedDataChartCard from '../components/dashboard/CleanedDataChartCard'
 import EmptyState from '../components/dashboard/EmptyState'
 import StatCard from '../components/dashboard/StatCard'
@@ -163,7 +163,7 @@ function VentasResumen({ datasets }: { datasets: Dataset[] }) {
             )}
 
             <div className="chart-grid">
-                {summary && <SalesByMonthCard monthly={summary.monthly} />}
+                {summary && <SalesAreaChart monthly={summary.monthly} />}
                 <CleanedDataChartCard datasets={datasets} selectedId={activeId} refreshKey={datasets.length} />
             </div>
         </div>

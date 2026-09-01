@@ -30,6 +30,12 @@ export default function VentasPage({ datasets, visibleSubmodules }: VentasPagePr
     const subtabs = ALL_SUBTABS.filter((tab) => visibleSubmodules.includes(tab.key))
     const [activeSub, setActiveSub] = useState<VentasSubmodule>(subtabs[0]?.key ?? 'resumen')
 
+    // CSV seleccionado, compartido entre las 3 sub-pestañas: si lo cambias
+    // en una, se mantiene al pasar a las otras (antes cada pestaña tenía su
+    // propio estado y se perdía la selección al cambiar de tab).
+    const [selectedDatasetId, setSelectedDatasetId] = useState('')
+    const activeDatasetId = selectedDatasetId || datasets[0]?.id || ''
+
     if (subtabs.length === 0) {
         return (
             <EmptyState
@@ -59,15 +65,26 @@ export default function VentasPage({ datasets, visibleSubmodules }: VentasPagePr
                 })}
             </div>
 
-            {activeSub === 'resumen' && <VentasResumen datasets={datasets} />}
-            {activeSub === 'clientes' && <VentasClientes datasets={datasets} />}
-            {activeSub === 'comparacion' && <VentasComparacion datasets={datasets} />}
+            {activeSub === 'resumen' && (
+                <VentasResumen datasets={datasets} selectedId={activeDatasetId} onSelectId={setSelectedDatasetId} />
+            )}
+            {activeSub === 'clientes' && (
+                <VentasClientes datasets={datasets} selectedId={activeDatasetId} onSelectId={setSelectedDatasetId} />
+            )}
+            {activeSub === 'comparacion' && (
+                <VentasComparacion datasets={datasets} selectedId={activeDatasetId} onSelectId={setSelectedDatasetId} />
+            )}
         </div>
     )
 }
 
-function VentasResumen({ datasets }: { datasets: Dataset[] }) {
-    const [selectedId, setSelectedId] = useState('')
+interface VentasSubProps {
+    datasets: Dataset[]
+    selectedId: string
+    onSelectId: (id: string) => void
+}
+
+function VentasResumen({ datasets, selectedId, onSelectId }: VentasSubProps) {
     const [summary, setSummary] = useState<SalesSummary | null>(null)
     const [summaryError, setSummaryError] = useState<string | null>(null)
     const [loadingSummary, setLoadingSummary] = useState(false)
@@ -103,7 +120,7 @@ function VentasResumen({ datasets }: { datasets: Dataset[] }) {
                 <select
                     className="input-field"
                     value={activeId}
-                    onChange={(e) => setSelectedId(e.target.value)}
+                    onChange={(e) => onSelectId(e.target.value)}
                     style={{ width: 'auto', minWidth: 200, padding: '8px 12px', marginBottom: 16 }}
                 >
                     {datasets.map((d) => (
@@ -170,8 +187,8 @@ function VentasResumen({ datasets }: { datasets: Dataset[] }) {
     )
 }
 
-function VentasClientes({ datasets }: { datasets: Dataset[] }) {
-    const [selectedId, setSelectedId] = useState('')
+function VentasClientes({ datasets, selectedId, onSelectId }: VentasSubProps) {
+    const activeId = selectedId || datasets[0]?.id || ''
 
     if (datasets.length === 0) {
         return <EmptyState icon={Users} title="Sin datasets todavía" description="Carga un archivo de ventas para ver clientes." />
@@ -186,8 +203,8 @@ function VentasClientes({ datasets }: { datasets: Dataset[] }) {
             {datasets.length > 1 && (
                 <select
                     className="input-field"
-                    value={selectedId || datasets[0]?.id || ''}
-                    onChange={(e) => setSelectedId(e.target.value)}
+                    value={activeId}
+                    onChange={(e) => onSelectId(e.target.value)}
                     style={{ width: 'auto', minWidth: 200, padding: '8px 12px', marginBottom: 12 }}
                 >
                     {datasets.map((d) => (
@@ -197,13 +214,13 @@ function VentasClientes({ datasets }: { datasets: Dataset[] }) {
                     ))}
                 </select>
             )}
-            <CleanedDataChartCard datasets={datasets} selectedId={selectedId || datasets[0]?.id || ''} refreshKey={datasets.length} />
+            <CleanedDataChartCard datasets={datasets} selectedId={activeId} refreshKey={datasets.length} />
         </div>
     )
 }
 
-function VentasComparacion({ datasets }: { datasets: Dataset[] }) {
-    const [selectedDatasetId, setSelectedDatasetId] = useState(datasets[0]?.id ?? '')
+function VentasComparacion({ datasets, selectedId, onSelectId }: VentasSubProps) {
+    const selectedDatasetId = selectedId || datasets[0]?.id || ''
     const [file, setFile] = useState<File | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -240,7 +257,7 @@ function VentasComparacion({ datasets }: { datasets: Dataset[] }) {
             <div className="settings-form-grid" style={{ marginTop: 16 }}>
                 <label className="settings-input settings-input-wide">
                     <span>Tu dataset (ya limpio)</span>
-                    <select value={selectedDatasetId} onChange={(e) => setSelectedDatasetId(e.target.value)}>
+                    <select value={selectedDatasetId} onChange={(e) => onSelectId(e.target.value)}>
                         <option value="">Selecciona un archivo…</option>
                         {datasets.map((d) => (
                             <option key={d.id} value={d.id}>

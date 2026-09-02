@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Download, FileSpreadsheet, FilterX, History, Table2, Activity, Trash2, WandSparkles } from 'lucide-react'
 import type { CleaningOptions, Dataset, DatasetPreview } from '../../lib/api'
 import { applyCleanDataset, getDatasetPreview, previewCleanDataset } from '../../lib/api'
@@ -16,7 +16,18 @@ interface DataCleaningPanelProps {
   onCleaned?: () => void
 }
 
-const STATUS_LABELS = { ok: 'Procesado', warn: 'En revisión', error: 'Error', processing: 'Procesando' } as const
+// Ojo: "status" es un puntaje de CALIDAD calculado al subir el archivo
+// (qué tan pocos nulos/duplicados tiene), NO si ya pasó por "Limpieza de
+// datos". Por eso el texto dice "Calidad ___" y no "Procesado" — decir
+// "Procesado" sonaba a "ya limpio" y generaba confusión.
+const STATUS_LABELS = { ok: 'Calidad buena', warn: 'Calidad regular', error: 'Calidad baja', processing: 'Procesando' } as const
+
+// "Procesado" (en verde) queda reservado para cuando el dataset YA pasó
+// por "Aplicar limpieza" — no solo por tener buena calidad al subir.
+function statusDisplay(d: Dataset) {
+  if (d.has_cleaned_version) return { label: 'Procesado', pillClass: 'ok' }
+  return { label: STATUS_LABELS[d.status], pillClass: d.status === 'processing' ? 'warn' : d.status }
+}
 const DEFAULT_OPTIONS: CleaningOptions = { remove_duplicates: false, null_strategy: 'ignore', convert_number: false, convert_dates: false, remove_empty_columns: false }
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -50,36 +61,72 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
   const setOption = <K extends keyof CleaningOptions>(key: K, value: CleaningOptions[K]) =>
     setOptions((c) => ({ ...c, [key]: value }))
 
-  // Cambio de dataset: cargar el "ANTES" y resetear opciones.
+  // Referencia con el id del dataset REALMENTE seleccionado en este momento
+  // (no el de cuando arrancó cada fetch). Sirve para que, si cambias de
+  // archivo mientras una petición anterior sigue en camino, esa respuesta
+  // vieja no pise los datos del archivo que estás viendo ahora.
+  const selectedIdRef = useRef('')
+  useEffect(() => {
+    selectedIdRef.current = selected?.id ?? ''
+  }, [selected?.id])
+
+  // Cambio de dataset: cargar el "ANTES" real y resetear opciones.
   useEffect(() => {
     if (!selected) return
-    setSelectedId(selected.id)
+    const id = selected.id
+    setSelectedId(id)
     setOptions(DEFAULT_OPTIONS)
     setBeforePreview(null)
     setAfterPreview(null)
     setCleanModal(null)
     setPreviewLoading(true)
-    getDatasetPreview(selected.id)
-      .then((result) => { setBeforePreview(result); setAfterPreview(result) })
-      .catch(() => { setBeforePreview(null); setAfterPreview(null) })
-      .finally(() => setPreviewLoading(false))
+    getDatasetPreview(id)
+      .then((result) => {
+        if (id !== selectedIdRef.current) return // el usuario ya cambió de archivo; ignorar
+        setBeforePreview(result)
+        setAfterPreview(result)
+      })
+      .catch(() => {
+        if (id === selectedIdRef.current) { setBeforePreview(null); setAfterPreview(null) }
+      })
+      .finally(() => {
+        if (id === selectedIdRef.current) setPreviewLoading(false)
+      })
   }, [selected?.id])
 
-  // Cambio de opciones: pedirle al backend el resultado real (debounced).
+  // Cambio de OPCIONES de limpieza (no de dataset): pedirle al backend el
+  // resultado real (debounced). Ojo: esto NO depende de selected?.id — solo
+  // reacciona a cambios reales de opciones hechos por el usuario. Si
+  // dependiera también del dataset, al cambiar de archivo este efecto se
+  // disparaba con las opciones "sucias" que habían quedado del archivo
+  // anterior (el reset a DEFAULT_OPTIONS del efecto de arriba todavía no se
+  // había aplicado en ese mismo instante), y esa respuesta tardía terminaba
+  // sobrescribiendo la vista previa correcta del archivo nuevo con el
+  // resultado de limpiar el archivo nuevo usando las opciones viejas — eso
+  // era el bug: "se muestra el preview del csv que ya se había limpiado".
   useEffect(() => {
-    if (!selected) return
-    setCleanModal(null)
     if (JSON.stringify(options) === JSON.stringify(DEFAULT_OPTIONS)) {
       if (beforePreview) setAfterPreview(beforePreview)
       return
     }
+    const id = selectedIdRef.current
+    if (!id) return
+    setCleanModal(null)
     setAfterLoading(true)
     const timeout = setTimeout(() => {
-      previewCleanDataset(selected.id, options).then(setAfterPreview).catch(() => { }).finally(() => setAfterLoading(false))
+      previewCleanDataset(id, options)
+        .then((result) => {
+          if (id !== selectedIdRef.current) return // ya no es el archivo activo; ignorar
+          setAfterPreview(result)
+        })
+        .catch(() => { })
+        .finally(() => {
+          if (id === selectedIdRef.current) setAfterLoading(false)
+        })
     }, 350)
     return () => clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options, selected?.id])
+  }, [options])
 
   const healthScore = useMemo(() => {
     if (!selected) return 0
@@ -198,7 +245,7 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
                   <td>{d.row_count.toLocaleString('es-PE')}</td>
                   <td>{d.column_count}</td>
                   <td><span className="quality-badge">{d.quality_score}%</span></td>
-                  <td><span className={`status-pill ${d.status === 'processing' ? 'warn' : d.status}`}><CheckCircle2 size={12} />{STATUS_LABELS[d.status]}</span></td>
+                  <td><span className={`status-pill ${statusDisplay(d).pillClass}`}><CheckCircle2 size={12} />{statusDisplay(d).label}</span></td>
                   <td>{formatDate(d.created_at)}</td>
                 </tr>
               ))}</tbody>

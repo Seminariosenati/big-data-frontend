@@ -142,6 +142,10 @@ export interface Dataset {
     duplicate_count: number
     quality_score: number
     status: 'processing' | 'ok' | 'warn' | 'error'
+    /** true si este dataset YA pasó por "Aplicar limpieza" (tiene una fila
+     * en cleaned_datasets). Distinto de `status`, que solo mide la calidad
+     * del archivo tal como se subió. */
+    has_cleaned_version: boolean
     columns_summary: DatasetColumnSummary[]
     created_at: string
 }
@@ -342,12 +346,20 @@ export interface CompareRecommendation {
     message: string
 }
 
+export interface JoinKeyCandidate {
+    column: string
+    match_pct: number
+    own_unique_values: number
+    other_unique_values: number
+}
+
 export interface CompareResult {
     own_columns: string[]
     other_columns: string[]
     extra_columns: string[]
     sales_column_detected: string | null
     recommendations: CompareRecommendation[]
+    join_key_candidates: JoinKeyCandidate[]
     ownFileName: string
     comparedFileName: string
 }
@@ -366,6 +378,46 @@ export async function compareDataset(datasetId: string, file: File) {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.detail || 'No se pudo comparar el archivo')
     return data as CompareResult
+}
+
+// ---------------------------------------------------------------------
+// Tabla temporal (enriquecer datos): le "pega" a tu dataset una o más
+// columnas de un CSV externo, cruzando filas por una columna clave (ej.
+// cliente_id). Igual que compareDataset, NUNCA se guarda nada — ni el CSV
+// externo ni la tabla resultante — se recalcula en cada llamada.
+// ---------------------------------------------------------------------
+export interface EnrichedPreview {
+    columns: string[]
+    addedColumns: string[]
+    totalRows: number
+    matchedRows: number
+    rows: Record<string, unknown>[]
+    ownFileName: string
+    comparedFileName: string
+    joinKey: string
+}
+
+export async function enrichDatasetPreview(
+    datasetId: string,
+    file: File,
+    joinKey: string,
+    columns: string[]
+) {
+    const session = getSession()
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('join_key', joinKey)
+    formData.append('columns', columns.join(','))
+
+    const res = await fetch(`${API_URL}/datasets/${datasetId}/enrich-preview`, {
+        method: 'POST',
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body: formData,
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.detail || 'No se pudo armar la tabla combinada')
+    return data as EnrichedPreview
 }
 
 // ---------------------------------------------------------------------

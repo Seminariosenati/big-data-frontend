@@ -4,7 +4,7 @@ import SalesAreaChart from '../components/dashboard/SalesAreaChart'
 import CleanedDataChartCard from '../components/dashboard/CleanedDataChartCard'
 import EmptyState from '../components/dashboard/EmptyState'
 import StatCard from '../components/dashboard/StatCard'
-import { compareDataset, getSalesSummaryForDataset, type CompareResult, type Dataset, type SalesSummary } from '../lib/api'
+import { compareDataset, enrichDatasetPreview, getSalesSummaryForDataset, type CompareResult, type Dataset, type EnrichedPreview, type SalesSummary } from '../lib/api'
 
 export type VentasSubmodule = 'resumen' | 'clientes' | 'comparacion'
 
@@ -227,6 +227,15 @@ function VentasComparacion({ datasets, selectedId, onSelectId }: VentasSubProps)
     const [result, setResult] = useState<CompareResult | null>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
+    // Tabla temporal: columnas que el analista eligió "traer" del CSV
+    // externo, cruzadas por una clave en común (ej. cliente_id). Nada de
+    // esto se guarda — se recalcula en memoria cada vez que cambia algo.
+    const [joinKey, setJoinKey] = useState('')
+    const [addedColumns, setAddedColumns] = useState<string[]>([])
+    const [enriched, setEnriched] = useState<EnrichedPreview | null>(null)
+    const [enrichLoading, setEnrichLoading] = useState(false)
+    const [enrichError, setEnrichError] = useState<string | null>(null)
+
     const handleCompare = async () => {
         if (!selectedDatasetId || !file) {
             setError('Selecciona tu archivo y sube el CSV de la otra farmacia.')
@@ -235,14 +244,65 @@ function VentasComparacion({ datasets, selectedId, onSelectId }: VentasSubProps)
         setLoading(true)
         setError(null)
         setResult(null)
+        setAddedColumns([])
+        setEnriched(null)
         try {
             const data = await compareDataset(selectedDatasetId, file)
             setResult(data)
+            setJoinKey(data.join_key_candidates[0]?.column ?? '')
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo comparar el archivo')
         } finally {
             setLoading(false)
         }
+    }
+
+    // Columnas por las que se podría cruzar: primero las candidatas
+    // detectadas (con buen % de coincidencia real), y después cualquier
+    // otra columna que exista en ambos archivos, por si el sistema no
+    // encontró una candidata fuerte y el analista quiere elegir a mano.
+    const otherColumnsLower = new Set((result?.other_columns ?? []).map((c) => c.toLowerCase()))
+    const candidateNames = new Set((result?.join_key_candidates ?? []).map((c) => c.column))
+    const fallbackSharedColumns = (result?.own_columns ?? []).filter(
+        (c) => otherColumnsLower.has(c.toLowerCase()) && !candidateNames.has(c)
+    )
+
+    // En tiempo real: cada vez que cambian las columnas agregadas o la
+    // clave elegida, se vuelve a pedir la tabla combinada (debounced).
+    useEffect(() => {
+        if (!result || !file || addedColumns.length === 0 || !joinKey) {
+            setEnriched(null)
+            return
+        }
+        setEnrichLoading(true)
+        setEnrichError(null)
+        const timeout = setTimeout(() => {
+            enrichDatasetPreview(selectedDatasetId, file, joinKey, addedColumns)
+                .then(setEnriched)
+                .catch((err) => {
+                    setEnriched(null)
+                    setEnrichError(err instanceof Error ? err.message : 'No se pudo armar la tabla combinada')
+                })
+                .finally(() => setEnrichLoading(false))
+        }, 300)
+        return () => clearTimeout(timeout)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [addedColumns, joinKey])
+
+    const toggleColumn = (column: string) => {
+        setAddedColumns((prev) => (prev.includes(column) ? prev.filter((c) => c !== column) : [...prev, column]))
+    }
+
+    const downloadEnrichedCsv = () => {
+        if (!enriched?.rows.length) return
+        const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+        const csv = [enriched.columns, ...enriched.rows.map((row) => enriched.columns.map((c) => row[c]))]
+            .map((r) => r.map(escape).join(','))
+            .join('\n')
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+        const link = Object.assign(document.createElement('a'), { href: url, download: 'tabla-temporal.csv' })
+        link.click()
+        URL.revokeObjectURL(url)
     }
 
     return (
@@ -278,7 +338,12 @@ function VentasComparacion({ datasets, selectedId, onSelectId }: VentasSubProps)
                         type="file"
                         accept=".csv,.xlsx,.xls"
                         hidden
-                        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                        onChange={(e) => {
+                            setFile(e.target.files?.[0] ?? null)
+                            setResult(null)
+                            setAddedColumns([])
+                            setEnriched(null)
+                        }}
                     />
                 </label>
             </div>
@@ -313,22 +378,118 @@ function VentasComparacion({ datasets, selectedId, onSelectId }: VentasSubProps)
                             description="La otra farmacia no tiene columnas que tú no tengas ya."
                         />
                     ) : (
-                        <ul className="ventas-recommendation-list">
-                            {result.recommendations.map((rec) => (
-                                <li key={rec.column} className={rec.impact_pct && rec.impact_pct > 0 ? 'positive' : ''}>
-                                    <div className="ventas-recommendation-header">
-                                        <strong>{rec.column}</strong>
-                                        {rec.impact_pct !== null && (
-                                            <span className={`status-badge ${rec.impact_pct > 0 ? 'success' : ''}`}>
-                                                {rec.impact_pct > 0 ? '+' : ''}
-                                                {rec.impact_pct}% ventas
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p>{rec.message}</p>
-                                </li>
-                            ))}
-                        </ul>
+                        <>
+                            <ul className="ventas-recommendation-list">
+                                {result.recommendations.map((rec) => {
+                                    const added = addedColumns.includes(rec.column)
+                                    return (
+                                        <li key={rec.column} className={rec.impact_pct && rec.impact_pct > 0 ? 'positive' : ''}>
+                                            <div className="ventas-recommendation-header">
+                                                <strong>{rec.column}</strong>
+                                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                    {rec.impact_pct !== null && (
+                                                        <span className={`status-badge ${rec.impact_pct > 0 ? 'success' : ''}`}>
+                                                            {rec.impact_pct > 0 ? '+' : ''}
+                                                            {rec.impact_pct}% ventas
+                                                        </span>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        className={`btn ${added ? 'btn-outline' : 'btn-primary'}`}
+                                                        style={{ padding: '4px 10px', fontSize: 12 }}
+                                                        onClick={() => toggleColumn(rec.column)}
+                                                        disabled={!joinKey}
+                                                    >
+                                                        {added ? 'Quitar de mi tabla' : 'Agregar a mi tabla'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p>{rec.message}</p>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
+
+                            {addedColumns.length > 0 && (
+                                <div className="settings-input settings-input-wide" style={{ marginTop: 4, maxWidth: 320 }}>
+                                    <span>Cruzar filas usando la columna</span>
+                                    <select value={joinKey} onChange={(e) => setJoinKey(e.target.value)}>
+                                        <option value="">Elige una columna clave…</option>
+                                        {result.join_key_candidates.map((c) => (
+                                            <option key={c.column} value={c.column}>
+                                                {c.column} ({c.match_pct}% de coincidencia)
+                                            </option>
+                                        ))}
+                                        {fallbackSharedColumns.map((c) => (
+                                            <option key={c} value={c}>
+                                                {c}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {result.join_key_candidates.length === 0 && (
+                                        <div className="settings-row-hint" style={{ marginTop: 4 }}>
+                                            No se detectó una clave con buena coincidencia automáticamente; elige tú
+                                            cuál columna identifica a la misma fila en ambos archivos.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+            {addedColumns.length > 0 && (
+                <div className="ventas-enriched-table" style={{ marginTop: 20 }}>
+                    <div className="panel-subtitle" style={{ marginBottom: 8 }}>
+                        Tabla temporal — se arma en memoria con cada cambio y{' '}
+                        <strong>nunca se guarda en el sistema</strong>. Útil para datos de vida corta (ofertas de un
+                        día, promociones puntuales).
+                    </div>
+
+                    {enrichLoading && (
+                        <div className="settings-row-hint">
+                            <Loader2 size={14} className="spin" /> Actualizando tabla…
+                        </div>
+                    )}
+                    {enrichError && <div className="form-alert error">{enrichError}</div>}
+
+                    {enriched && !enrichLoading && (
+                        <>
+                            <div className="settings-row-hint" style={{ marginBottom: 8 }}>
+                                {enriched.matchedRows} de {enriched.totalRows} filas encontraron coincidencia por "
+                                {enriched.joinKey}".
+                            </div>
+                            <div className="data-table-wrapper">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            {enriched.columns.map((c) => (
+                                                <th key={c} className={enriched.addedColumns.includes(c) ? 'ventas-added-col' : ''}>
+                                                    {c}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {enriched.rows.map((row, i) => (
+                                            <tr key={i}>
+                                                {enriched.columns.map((c) => (
+                                                    <td key={c}>{String(row[c] ?? '—')}</td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="panel-subtitle" style={{ marginTop: 8, marginBottom: 0 }}>
+                                Mostrando {enriched.rows.length.toLocaleString('es-PE')} de{' '}
+                                {enriched.totalRows.toLocaleString('es-PE')} filas.{' '}
+                                <button type="button" className="link-btn" onClick={downloadEnrichedCsv}>
+                                    Descargar CSV
+                                </button>
+                            </div>
+                        </>
                     )}
                 </div>
             )}

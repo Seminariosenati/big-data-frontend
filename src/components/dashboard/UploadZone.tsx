@@ -34,7 +34,18 @@ interface UploadItem {
 
 const PREVIEW_ROW_LIMIT = 50
 
-const STATUS_LABELS = { ok: 'Procesado', warn: 'En revisión', error: 'Error', processing: 'Procesando' } as const
+// Ojo: "status" es un puntaje de CALIDAD calculado al subir el archivo
+// (qué tan pocos nulos/duplicados tiene), NO si ya pasó por "Limpieza de
+// datos". Por eso el texto dice "Calidad ___" y no "Procesado" — decir
+// "Procesado" sonaba a "ya limpio" y generaba confusión.
+const STATUS_LABELS = { ok: 'Calidad buena', warn: 'Calidad regular', error: 'Calidad baja', processing: 'Procesando' } as const
+
+// "Procesado" (en verde) queda reservado para cuando el dataset YA pasó
+// por "Aplicar limpieza" — no solo por tener buena calidad al subir.
+function statusDisplay(d: Dataset) {
+  if (d.has_cleaned_version) return { label: 'Procesado', pillClass: 'ok' }
+  return { label: STATUS_LABELS[d.status], pillClass: d.status === 'processing' ? 'warn' : d.status }
+}
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -285,8 +296,8 @@ export default function UploadZone({ datasets, datasetsLoading, onUploaded, onGo
                         <td>{d.column_count}</td>
                         <td><span className="quality-badge">{d.quality_score}%</span></td>
                         <td>
-                          <span className={`status-pill ${d.status === 'processing' ? 'warn' : d.status}`}>
-                            {STATUS_LABELS[d.status]}
+                          <span className={`status-pill ${statusDisplay(d).pillClass}`}>
+                            {statusDisplay(d).label}
                           </span>
                         </td>
                         <td>{formatDate(d.created_at)}</td>

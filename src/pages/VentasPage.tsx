@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { TrendingUp, Users, GitCompareArrows, UploadCloud, Loader2, DollarSign, Receipt, Award, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
 import SalesAreaChart from '../components/dashboard/SalesAreaChart'
+import SalesCategoryDonutChart from '../components/dashboard/SalesCategoryDonutChart'
 import CleanedDataChartCard from '../components/dashboard/CleanedDataChartCard'
 import EmptyState from '../components/dashboard/EmptyState'
 import StatCard from '../components/dashboard/StatCard'
-import { compareDataset, enrichDatasetPreview, getSalesSummaryForDataset, type CompareResult, type Dataset, type EnrichedPreview, type SalesSummary } from '../lib/api'
+import { compareDataset, enrichDatasetPreview, getSalesSummaryForDataset, getSalesPeriodBreakdown, type CompareResult, type Dataset, type EnrichedPreview, type SalesSummary } from '../lib/api'
 
 export type VentasSubmodule = 'resumen' | 'clientes' | 'comparacion'
 
@@ -89,12 +90,21 @@ function VentasResumen({ datasets, selectedId, onSelectId }: VentasSubProps) {
     const [summaryError, setSummaryError] = useState<string | null>(null)
     const [loadingSummary, setLoadingSummary] = useState(false)
 
+    // Periodo actual visto en "Evolución de Ventas" (null = vista general de
+    // todos los meses). La dona de categorías se recalcula cada vez que
+    // cambia, para reflejar siempre lo que el usuario está mirando.
+    const [period, setPeriod] = useState<{ month: string | null; day: string | null }>({ month: null, day: null })
+    const [categories, setCategories] = useState<{ name: string; total: number }[] | null>(null)
+    const [loadingCategories, setLoadingCategories] = useState(false)
+
     const activeId = selectedId || datasets[0]?.id || ''
+    const activeDataset = datasets.find((d) => d.id === activeId)
 
     useEffect(() => {
         if (!activeId) return
         setLoadingSummary(true)
         setSummaryError(null)
+        setPeriod({ month: null, day: null })
         getSalesSummaryForDataset(activeId)
             .then(setSummary)
             .catch((err) => {
@@ -103,6 +113,27 @@ function VentasResumen({ datasets, selectedId, onSelectId }: VentasSubProps) {
             })
             .finally(() => setLoadingSummary(false))
     }, [activeId])
+
+    // Recalcula la dona de categorías cada vez que cambia el dataset o el
+    // periodo elegido en "Evolución de Ventas" (todos los meses, un mes
+    // puntual, o un día puntual dentro de ese mes).
+    useEffect(() => {
+        if (!activeId || !summary?.category_column) {
+            setCategories(null)
+            return
+        }
+        setLoadingCategories(true)
+        getSalesPeriodBreakdown(activeId, period.month ?? undefined, period.day ?? undefined)
+            .then((res) => setCategories(res.categories))
+            .catch(() => setCategories(null))
+            .finally(() => setLoadingCategories(false))
+    }, [activeId, period, summary?.category_column])
+
+    const periodLabel = period.day
+        ? new Date(`${period.day}T00:00:00`).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' })
+        : period.month
+            ? new Date(`${period.month}-01T00:00:00`).toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })
+            : 'Todos los meses'
 
     if (datasets.length === 0) {
         return (
@@ -180,8 +211,21 @@ function VentasResumen({ datasets, selectedId, onSelectId }: VentasSubProps) {
             )}
 
             <div className="chart-grid">
-                {summary && <SalesAreaChart monthly={summary.monthly} />}
-                <CleanedDataChartCard datasets={datasets} selectedId={activeId} refreshKey={datasets.length} />
+                {summary && (
+                    <SalesAreaChart
+                        datasetId={activeId}
+                        monthly={summary.monthly}
+                        hasDailyDetail={summary.has_daily_detail}
+                        onPeriodChange={setPeriod}
+                    />
+                )}
+                <SalesCategoryDonutChart
+                    categories={categories}
+                    loading={loadingCategories}
+                    fileName={activeDataset?.file_name}
+                    categoryColumnName={summary?.category_column ?? null}
+                    periodLabel={periodLabel}
+                />
             </div>
         </div>
     )

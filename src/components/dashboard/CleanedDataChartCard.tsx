@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getChartColumnsForDataset, getChartColumnDataForDataset, type ChartColumn, type ChartColumnData, type Dataset } from '../../lib/api'
 import ColumnChart from './ColumnChart'
 
@@ -17,40 +17,97 @@ export default function CleanedDataChartCard({ datasets, selectedId, refreshKey 
   const [loadingData, setLoadingData] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Recuerda el último "activeId + columna" que ya se pidió automáticamente
+  // al cambiar de dataset, para que el efecto de "columna elegida a mano"
+  // no repita esa misma petición apenas un instante después.
+  const lastAutoFetchedKey = useRef<string>('')
+
   const activeId = selectedId || datasets[0]?.id || ''
   const activeDataset = datasets.find((d) => d.id === activeId)
 
-  // Cambio de dataset (o de datasets tras subir uno nuevo): recargar las
-  // columnas disponibles de la versión limpia de ESE archivo puntual.
+  // Cambio de dataset (o de datasets tras subir uno nuevo): recargar
+  // columnas y datos del nuevo archivo EN SECUENCIA, no en efectos
+  // separados. Antes, un efecto de "columnas" y otro de "datos del
+  // gráfico" corrían en paralelo: al cambiar de CSV, el efecto de datos
+  // se disparaba de inmediato con el `activeId` nuevo pero todavía con la
+  // columna `selected` del CSV ANTERIOR (que puede no existir en el
+  // nuevo), provocando un 404 real que se autocorregía un instante
+  // después al llegar la respuesta de columnas. La bandera `cancelled`
+  // evita que una respuesta tardía de un dataset ya no activo pise el
+  // estado del dataset que el usuario está viendo ahora.
   useEffect(() => {
+    let cancelled = false
     if (!activeId) {
       setColumns([])
+      setChartData(null)
       setLoadingColumns(false)
       return
     }
     setLoadingColumns(true)
     setError(null)
+    setChartData(null)
+
     getChartColumnsForDataset(activeId)
-      .then((res) => {
+      .then(async (res) => {
+        if (cancelled) return
         setColumns(res.columns)
-        setSelected((prev) => (res.columns.some((c) => c.name === prev) ? prev : res.columns[0]?.name ?? ''))
+        const nextSelected = res.columns.some((c) => c.name === selected) ? selected : res.columns[0]?.name ?? ''
+        setSelected(nextSelected)
+        setLoadingColumns(false)
+
+        if (!nextSelected) return
+        setLoadingData(true)
+        try {
+          const data = await getChartColumnDataForDataset(activeId, nextSelected)
+          if (!cancelled) {
+            setChartData(data)
+            lastAutoFetchedKey.current = `${activeId}|${nextSelected}`
+          }
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : 'No se pudieron cargar los datos')
+        } finally {
+          if (!cancelled) setLoadingData(false)
+        }
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'No se pudieron cargar las columnas'))
-      .finally(() => setLoadingColumns(false))
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'No se pudieron cargar las columnas')
+          setLoadingColumns(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, refreshKey])
 
+  // Cuando el usuario cambia la columna manualmente desde el <select>
+  // (mismo dataset), solo se vuelve a pedir el dato de esa columna. Si
+  // este par ya fue traído hace un instante por el efecto de arriba (justo
+  // después de cambiar de dataset), se evita repetir la misma petición.
   useEffect(() => {
-    if (!activeId || !selected) {
-      setChartData(null)
-      return
-    }
+    if (!activeId || !selected) return
+    if (lastAutoFetchedKey.current === `${activeId}|${selected}`) return
+    let cancelled = false
     setLoadingData(true)
     setError(null)
     getChartColumnDataForDataset(activeId, selected)
-      .then(setChartData)
-      .catch((err) => setError(err instanceof Error ? err.message : 'No se pudieron cargar los datos'))
-      .finally(() => setLoadingData(false))
-  }, [activeId, selected])
+      .then((data) => {
+        if (!cancelled) setChartData(data)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'No se pudieron cargar los datos')
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingData(false)
+
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected])
 
   return (
     <div className="panel-card">

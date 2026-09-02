@@ -311,12 +311,32 @@ export interface SalesSummary {
     top_category: { name: string; total: number } | null
     monthly: { month: string; total: number }[]
     trend_pct: number | null
+    has_daily_detail: boolean
 }
 
 export function getSalesSummaryForDataset(datasetId: string) {
     return request<SalesSummary>(`/datasets/${datasetId}/sales-summary`, {
         headers: authHeaders(),
     })
+}
+
+export interface SalesPeriodBreakdown {
+    daily_points: { day: string; total: number }[] | null
+    categories: { name: string; total: number }[] | null
+}
+
+// Desglose de un periodo puntual (mes, o mes+día) para "Evolución de
+// Ventas" (detalle diario, si el dataset lo tiene) y la dona de
+// categorías. Sin `month`, categories cubre todo el dataset.
+export function getSalesPeriodBreakdown(datasetId: string, month?: string, day?: string) {
+    const params = new URLSearchParams()
+    if (month) params.set('month', month)
+    if (day) params.set('day', day)
+    const query = params.toString()
+    return request<SalesPeriodBreakdown>(
+        `/datasets/${datasetId}/sales-summary/period${query ? `?${query}` : ''}`,
+        { headers: authHeaders() }
+    )
 }
 
 // Variantes "sin limpiar": usan el archivo tal como se subió (con nulos,

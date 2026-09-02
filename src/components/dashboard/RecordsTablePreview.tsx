@@ -21,19 +21,32 @@ export default function RecordsTablePreview({ datasets, loading, selectedId, onS
   const activeId = selectedId || datasets[0]?.id || ''
 
   // El Dashboard debe mostrar los datos DESPUÉS de la limpieza, no el
-  // archivo tal como se subió, así que pedimos la versión limpia.
+  // archivo tal como se subió, así que pedimos la versión limpia. La
+  // bandera `cancelled` evita que, si cambias de archivo rápido, una
+  // respuesta tardía de un dataset ya no activo sobreescriba lo que el
+  // usuario está viendo ahora.
   useEffect(() => {
     if (!activeId) {
       setPreview(null)
       return
     }
+    let cancelled = false
     setPreviewLoading(true)
     setError('')
     setPreview(null)
     getCleanedDatasetPreview(activeId)
-      .then(setPreview)
-      .catch((err) => setError(err instanceof Error ? err.message : NOT_CLEANED_MESSAGE))
-      .finally(() => setPreviewLoading(false))
+      .then((res) => {
+        if (!cancelled) setPreview(res)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : NOT_CLEANED_MESSAGE)
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [activeId])
 
   const columns = preview?.columns ?? []

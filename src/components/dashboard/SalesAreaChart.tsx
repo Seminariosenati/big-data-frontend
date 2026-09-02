@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -11,27 +11,18 @@ import {
   YAxis,
 } from 'recharts'
 import { useChartView } from '../../lib/chartViewContext'
+import { getSalesPeriodBreakdown } from '../../lib/api'
 
 interface SalesAreaChartProps {
+  datasetId: string
   monthly: { month: string; total: number }[]
+  hasDailyDetail: boolean
+  /** Notifica hacia arriba qué periodo está viendo el usuario (mes y, si
+   * aplica, día puntual), para que la dona de categorías se recalcule. */
+  onPeriodChange: (period: { month: string | null; day: string | null }) => void
 }
 
-type PeriodKey = '3m' | '30d' | '7d'
-
-const PERIODS: { key: PeriodKey; label: string }[] = [
-  { key: '3m', label: 'Últimos 3 meses' },
-  { key: '30d', label: 'Últimos 30 días' },
-  { key: '7d', label: 'Últimos 7 días' },
-]
-
-// Puntos mensuales a mostrar según el filtro. El backend entrega ventas
-// agregadas por mes (no por día), así que "30 días"≈4 meses y "7 días"≈1-2
-// meses en la resolución disponible.
-const PERIOD_POINTS: Record<PeriodKey, number> = {
-  '3m': 3,
-  '30d': 4,
-  '7d': 2,
-}
+const ALL_MONTHS = '__all__'
 
 const formatMoney = (value: number) =>
   value.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -40,6 +31,12 @@ function monthLabel(raw: string) {
   const d = new Date(`${raw}-01T00:00:00`)
   if (Number.isNaN(d.getTime())) return raw
   return d.toLocaleDateString('es-PE', { month: 'short', year: '2-digit' }).replace('.', '')
+}
+
+function dayLabel(raw: string) {
+  const d = new Date(`${raw}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return raw
+  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }).replace('.', '')
 }
 
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value?: number }> }) {
@@ -53,27 +50,73 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
   )
 }
 
-export default function SalesAreaChart({ monthly }: SalesAreaChartProps) {
-  const [period, setPeriod] = useState<PeriodKey>('3m')
+export default function SalesAreaChart({ datasetId, monthly, hasDailyDetail, onPeriodChange }: SalesAreaChartProps) {
+  // '__all__' = vista general (los 12 meses); cualquier otro valor es un
+  // mes puntual ('YYYY-MM') que el usuario eligió del dropdown.
+  const [selectedMonth, setSelectedMonth] = useState<string>(ALL_MONTHS)
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const [dailyPoints, setDailyPoints] = useState<{ day: string; total: number }[] | null>(null)
+  const [loadingDaily, setLoadingDaily] = useState(false)
   const { view } = useChartView()
 
+  const availableMonths = useMemo(() => monthly.map((m) => m.month), [monthly])
+
+  // Al cambiar de dataset, vuelve a la vista general.
+  useEffect(() => {
+    setSelectedMonth(ALL_MONTHS)
+    setSelectedDay(null)
+  }, [datasetId])
+
+  // Si el dataset tiene detalle diario y el usuario eligió un mes puntual,
+  // pide el desglose día a día de ese mes. Si no tiene detalle diario, no
+  // se pide nada: solo existe la vista general de 12 meses.
+  useEffect(() => {
+    setSelectedDay(null)
+    if (!hasDailyDetail || selectedMonth === ALL_MONTHS) {
+      setDailyPoints(null)
+      onPeriodChange({ month: selectedMonth === ALL_MONTHS ? null : selectedMonth, day: null })
+      return
+    }
+    setLoadingDaily(true)
+    getSalesPeriodBreakdown(datasetId, selectedMonth)
+      .then((res) => {
+        setDailyPoints(res.daily_points)
+        onPeriodChange({ month: selectedMonth, day: null })
+      })
+      .catch(() => setDailyPoints(null))
+      .finally(() => setLoadingDaily(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonth, hasDailyDetail, datasetId])
+
   const data = useMemo(() => {
-    const points = PERIOD_POINTS[period]
-    const sliced = monthly.slice(-points)
-    if (sliced.length === 0) return []
-    const avg = sliced.reduce((sum, m) => sum + m.total, 0) / sliced.length
-    return sliced.map((m, i) => {
-      const prev = sliced[i - 1]?.total
-      return {
-        name: monthLabel(m.month),
-        full: m.month,
-        ventas: m.total,
-        // Referencia comparativa: valor del mes anterior cuando existe,
-        // sino el promedio del período (línea gris punteada).
-        anterior: prev ?? avg,
-      }
+    if (selectedMonth !== ALL_MONTHS && hasDailyDetail && dailyPoints) {
+      const avg = dailyPoints.length ? dailyPoints.reduce((sum, d) => sum + d.total, 0) / dailyPoints.length : 0
+      return dailyPoints.map((d, i) => ({
+        name: dayLabel(d.day),
+        full: d.day,
+        ventas: d.total,
+        anterior: dailyPoints[i - 1]?.total ?? avg,
+      }))
+    }
+    if (monthly.length === 0) return []
+    const avg = monthly.reduce((sum, m) => sum + m.total, 0) / monthly.length
+    return monthly.map((m, i) => ({
+      name: monthLabel(m.month),
+      full: m.month,
+      ventas: m.total,
+      anterior: monthly[i - 1]?.total ?? avg,
+    }))
+  }, [monthly, selectedMonth, hasDailyDetail, dailyPoints])
+
+  const handlePointClick = (point: { full?: string }) => {
+    if (selectedMonth === ALL_MONTHS || !hasDailyDetail || !point?.full) return
+    const day = point.full
+    setSelectedDay((prev) => {
+      const next = prev === day ? null : day
+      onPeriodChange({ month: selectedMonth, day: next })
+      return next
     })
-  }, [monthly, period])
+  }
 
   if (!monthly || monthly.length === 0) {
     return (
@@ -84,30 +127,46 @@ export default function SalesAreaChart({ monthly }: SalesAreaChartProps) {
     )
   }
 
-  const periodLabel = PERIODS.find((p) => p.key === period)?.label ?? ''
+  const viewingMonth = selectedMonth !== ALL_MONTHS
+  const showingDaily = viewingMonth && hasDailyDetail
+  const subtitle = showingDaily
+    ? `Detalle diario de ${monthLabel(selectedMonth)}${selectedDay ? ` · ${dayLabel(selectedDay)}` : ''}`
+    : 'Tendencia de ingresos y transacciones (vista general por mes)'
 
   return (
     <div className="panel-card sales-area-card">
       <div className="sales-area-head">
         <div>
           <div className="panel-title">Evolución de Ventas</div>
-          <div className="panel-subtitle">
-            Tendencia de ingresos y transacciones {periodLabel ? `(${periodLabel.toLowerCase()})` : ''}
-          </div>
+          <div className="panel-subtitle">{subtitle}</div>
         </div>
-        <div className="sales-area-pills" role="group" aria-label="Selector de periodo">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className={`sales-area-pill ${period === p.key ? 'active' : ''}`}
-              onClick={() => setPeriod(p.key)}
-            >
-              {p.label}
-            </button>
+        <select
+          className="input-field sales-area-month-select"
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+        >
+          <option value={ALL_MONTHS}>Todos los meses</option>
+          {availableMonths.map((m) => (
+            <option key={m} value={m}>
+              {monthLabel(m)}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
+
+      {viewingMonth && !hasDailyDetail && (
+        <div className="settings-row-hint" style={{ marginTop: 4 }}>
+          Este dataset no trae fechas con suficiente detalle diario, así que se mantiene la vista general por mes.
+        </div>
+      )}
+
+      {loadingDaily && <div className="settings-row-hint" style={{ marginTop: 4 }}>Cargando detalle diario…</div>}
+
+      {viewingMonth && hasDailyDetail && !loadingDaily && dailyPoints && dailyPoints.length > 0 && (
+        <div className="settings-row-hint" style={{ marginTop: 4 }}>
+          Haz clic en un día para ver sus categorías en el gráfico de la derecha.
+        </div>
+      )}
 
       <div className="sales-area-chart">
         <ResponsiveContainer width="100%" height={230}>
@@ -135,7 +194,14 @@ export default function SalesAreaChart({ monthly }: SalesAreaChartProps) {
                 tickFormatter={(value: number) => `S/ ${value >= 1000 ? `${Math.round(value / 1000)}k` : Math.round(value)}`}
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--border-soft)' }} />
-              <Bar dataKey="ventas" fill="url(#salesBarGradient)" radius={[4, 4, 0, 0]} maxBarSize={34} />
+              <Bar
+                dataKey="ventas"
+                fill="url(#salesBarGradient)"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={34}
+                onClick={(point: any) => handlePointClick(point ?? {})}
+                style={{ cursor: showingDaily ? 'pointer' : 'default' }}
+              />
             </BarChart>
           ) : (
             <AreaChart data={data} margin={{ top: 12, right: 6, left: 0, bottom: 0 }}>
@@ -168,7 +234,7 @@ export default function SalesAreaChart({ monthly }: SalesAreaChartProps) {
                 strokeWidth={2.5}
                 fill="url(#salesAreaGradient)"
                 dot={{ r: 3, fill: '#f59e0b', strokeWidth: 0 }}
-                activeDot={{ r: 5 }}
+                activeDot={{ r: 5, onClick: (_: unknown, e: any) => handlePointClick(e?.payload ?? {}) }}
               />
               <Area
                 type="natural"

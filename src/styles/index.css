@@ -2154,6 +2154,7 @@ a {
 }
 
 @keyframes pulse-dot {
+
   0%,
   100% {
     opacity: 0.3;
@@ -2732,6 +2733,7 @@ a {
 }
 
 @keyframes cleaning-breathe {
+
   0%,
   100% {
     opacity: 0.55;
@@ -2768,12 +2770,10 @@ a {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.35),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.35),
+      transparent);
   animation: cleaning-shimmer 1.3s ease-in-out infinite;
 }
 
@@ -3076,7 +3076,8 @@ a {
   grid-column: span 2;
 }
 
-.settings-input input {
+.settings-input input,
+.settings-input select {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid var(--border);
@@ -3087,8 +3088,25 @@ a {
   outline: none;
 }
 
-.settings-input input:focus {
+.settings-input input:focus,
+.settings-input select:focus {
   border-color: var(--primary);
+}
+
+.settings-input select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236f6b81' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 34px;
+}
+
+.settings-input select option {
+  background: var(--panel-soft);
+  color: var(--text-main);
 }
 
 .settings-input-icon {
@@ -3152,6 +3170,74 @@ a {
 .status-badge.success {
   background: rgba(74, 222, 128, 0.16);
   color: var(--success);
+}
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.priority-badge.priority-alta {
+  background: rgba(74, 222, 128, 0.16);
+  color: var(--success);
+}
+
+.priority-badge.priority-media {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.priority-badge.priority-baja {
+  background: var(--panel-soft);
+  color: var(--text-faint);
+}
+
+.ventas-executive-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--primary-soft), transparent);
+}
+
+.ventas-executive-summary-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ventas-executive-summary p {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ventas-executive-summary-action {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.ventas-executive-summary-action .status-badge {
+  width: fit-content;
 }
 
 .settings-subheading {

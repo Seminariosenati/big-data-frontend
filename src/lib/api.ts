@@ -340,10 +340,15 @@ export function getRawChartColumnDataForDataset(datasetId: string, column: strin
 // lo compara contra tu dataset ya limpio, y descarta el archivo al
 // responder. No aparece en "Cargar datos" ni en ningún listado.
 // ---------------------------------------------------------------------
+export type ComparePriority = 'alta' | 'media' | 'baja'
+
 export interface CompareRecommendation {
     column: string
     impact_pct: number | null
+    priority: ComparePriority
     message: string
+    method: 'cruce_historico' | 'archivo_externo' | null
+    easy_to_apply: boolean
 }
 
 export interface JoinKeyCandidate {
@@ -353,12 +358,32 @@ export interface JoinKeyCandidate {
     other_unique_values: number
 }
 
+export interface CompareTopRecommendation {
+    column: string
+    impact_pct: number | null
+    priority: ComparePriority
+}
+
+export interface ComparePriorityRecommendation {
+    column: string
+    impact_pct: number | null
+    priority: ComparePriority
+    action: string
+}
+
+export interface CompareExecutiveSummary {
+    headline: string
+    top_recommendations: CompareTopRecommendation[]
+    priority_recommendation: ComparePriorityRecommendation | null
+}
+
 export interface CompareResult {
     own_columns: string[]
     other_columns: string[]
     extra_columns: string[]
     sales_column_detected: string | null
     recommendations: CompareRecommendation[]
+    executive_summary: CompareExecutiveSummary
     join_key_candidates: JoinKeyCandidate[]
     ownFileName: string
     comparedFileName: string

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { TrendingUp, Users, GitCompareArrows, UploadCloud, Loader2, DollarSign, Receipt, Award, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { TrendingUp, Users, GitCompareArrows, UploadCloud, Loader2, DollarSign, Receipt, Award, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
 import SalesAreaChart from '../components/dashboard/SalesAreaChart'
 import CleanedDataChartCard from '../components/dashboard/CleanedDataChartCard'
 import EmptyState from '../components/dashboard/EmptyState'
@@ -379,6 +379,20 @@ function VentasComparacion({ datasets, selectedId, onSelectId }: VentasSubProps)
                         />
                     ) : (
                         <>
+                            <div className="ventas-executive-summary">
+                                <div className="ventas-executive-summary-title">
+                                    <Sparkles size={15} />
+                                    Resumen ejecutivo
+                                </div>
+                                <p>{result.executive_summary.headline}</p>
+                                {result.executive_summary.priority_recommendation && (
+                                    <div className="ventas-executive-summary-action">
+                                        <span className="status-badge success">Acción sugerida</span>
+                                        <p>{result.executive_summary.priority_recommendation.action}</p>
+                                    </div>
+                                )}
+                            </div>
+
                             <ul className="ventas-recommendation-list">
                                 {result.recommendations.map((rec) => {
                                     const added = addedColumns.includes(rec.column)
@@ -387,6 +401,14 @@ function VentasComparacion({ datasets, selectedId, onSelectId }: VentasSubProps)
                                             <div className="ventas-recommendation-header">
                                                 <strong>{rec.column}</strong>
                                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                    <span
+                                                        className={`priority-badge priority-${rec.priority}`}
+                                                        title="Prioridad de incorporar esta columna"
+                                                    >
+                                                        {rec.priority === 'alta' && 'Prioridad alta'}
+                                                        {rec.priority === 'media' && 'Prioridad media'}
+                                                        {rec.priority === 'baja' && 'Prioridad baja'}
+                                                    </span>
                                                     {rec.impact_pct !== null && (
                                                         <span className={`status-badge ${rec.impact_pct > 0 ? 'success' : ''}`}>
                                                             {rec.impact_pct > 0 ? '+' : ''}

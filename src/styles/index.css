@@ -1100,6 +1100,36 @@ a {
   position: sticky;
   top: 0;
   height: 100vh;
+  transition: width 0.18s ease;
+  overflow: hidden;
+}
+
+.sidebar-collapsed .dash-sidebar {
+  width: 76px;
+  padding: 22px 12px;
+}
+
+.sidebar-collapsed .dash-brand {
+  justify-content: center;
+}
+
+.sidebar-collapsed .dash-nav-label,
+.sidebar-collapsed .dash-brand-text {
+  display: none;
+}
+
+.sidebar-collapsed .dash-collapse-btn {
+  margin-left: 0;
+}
+
+.sidebar-collapsed .dash-nav-item,
+.sidebar-collapsed .dash-theme-toggle,
+.sidebar-collapsed .dash-logout {
+  justify-content: center;
+}
+
+.sidebar-collapsed .dash-user {
+  justify-content: center;
 }
 
 .dash-brand {
@@ -1109,6 +1139,37 @@ a {
   padding: 4px 8px 22px;
   border-bottom: 1px solid var(--border-soft);
   margin-bottom: 16px;
+  position: relative;
+}
+
+.dash-brand-text {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dash-collapse-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.dash-collapse-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.dash-mobile-toggle {
+  display: none;
 }
 
 .dash-brand-name {
@@ -1294,24 +1355,80 @@ a {
     flex-direction: column;
   }
 
-  .dash-sidebar {
-    width: 100%;
-    height: auto;
-    position: relative;
-    flex-direction: row;
-    flex-wrap: wrap;
+  .dash-mobile-toggle {
+    display: flex;
     align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: var(--panel);
+    border: none;
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--text-main);
+    padding: 16px 20px;
+    font-size: 15px;
+    cursor: pointer;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
+  .dash-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 260px;
+    max-width: 82vw;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 40;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .dash-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0);
+  }
+
+  .sidebar-collapsed .dash-sidebar {
+    width: 260px;
+    padding: 22px 16px;
+  }
+
+  .sidebar-collapsed .dash-nav-label,
+  .sidebar-collapsed .dash-brand-text {
+    display: block;
+  }
+
+  .sidebar-collapsed .dash-nav-item,
+  .sidebar-collapsed .dash-theme-toggle,
+  .sidebar-collapsed .dash-logout,
+  .sidebar-collapsed .dash-user {
+    justify-content: flex-start;
+  }
+
+  .dash-collapse-btn {
+    display: none;
+  }
+
+  .dash-sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 35;
   }
 
   .dash-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
+    flex-wrap: nowrap;
   }
 
   .dash-sidebar-footer {
-    border-top: none;
-    flex-direction: row;
-    margin-left: auto;
+    border-top: 1px solid var(--border-soft);
+    flex-direction: column;
+    margin-left: 0;
   }
 
   .dash-topbar,
@@ -1595,6 +1712,29 @@ a {
   color: var(--primary);
 }
 
+.sales-area-month-select {
+  width: 150px;
+  max-width: 150px;
+  flex: 0 0 150px;
+  padding: 9px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 13px;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+[data-theme='light'] .sales-area-month-select {
+  background: var(--panel-soft);
+}
+
+.sales-area-month-select:focus {
+  border-color: var(--primary);
+}
+
 .sales-area-chart {
   width: 100%;
 }
@@ -1796,6 +1936,74 @@ a {
   box-shadow: inset 3px 0 var(--primary);
 }
 
+.cleaning-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.cleaning-file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  width: 100%;
+  text-align: left;
+  background: var(--panel-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--text-main);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.cleaning-file-row:hover {
+  border-color: var(--border);
+}
+
+.cleaning-file-row.selected {
+  border-color: var(--primary);
+  background: rgba(232, 163, 61, 0.09);
+  box-shadow: inset 3px 0 var(--primary);
+}
+
+.cleaning-file-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.cleaning-file-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cleaning-file-meta {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.cleaning-file-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.cleaning-file-date {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
 .quality-badge {
   color: var(--success);
   background: var(--success-soft);
@@ -1833,9 +2041,27 @@ a {
 
 .cleaning-workspace {
   display: grid;
-  grid-template-columns: minmax(280px, .8fr) minmax(420px, 1.5fr);
+  grid-template-columns: minmax(320px, 1.4fr) minmax(280px, 1fr);
   gap: 18px;
   align-items: start;
+}
+
+.cleaning-top-preview {
+  width: 100%;
+}
+
+/* La tabla de vista previa sí debe adaptarse al alto de la pantalla
+   (crece si haces zoom out, se achica al zoom normal) con su propio
+   scroll interno — a diferencia del resto de la página, que ahora crece
+   libremente y usa el scroll normal del navegador. */
+.cleaning-top-preview .preview-table-scroll {
+  max-height: 48vh;
+}
+
+.cleaning-top-preview .preview-table-scroll .data-table th,
+.cleaning-top-preview .preview-table-scroll .data-table td {
+  font-size: 13px;
+  padding: 10px 14px;
 }
 
 .cleaning-tools,
@@ -1982,6 +2208,7 @@ a {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
+  flex: 0 0 auto;
 }
 
 .cleaning-summary span {
@@ -2107,8 +2334,13 @@ a {
 }
 
 .cleaning-tab-body {
-  flex: 1;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cleaning-preview-tab {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Toggle Original / Limpio */
@@ -2175,7 +2407,6 @@ a {
 
 .preview-table-scroll {
   overflow: auto;
-  max-height: 320px;
 }
 
 .preview-table-scroll .data-table {
@@ -2331,12 +2562,15 @@ a {
 .cleaning-export-bar {
   display: flex;
   gap: 10px;
-  padding-top: 16px;
-  margin-top: 16px;
+  padding-top: 14px;
+  margin-top: 14px;
   border-top: 1px solid var(--border-soft);
+  flex: 0 0 auto;
 }
 
 .cleaning-export-bar .btn {
+  padding: 9px 12px;
+  font-size: 12.5px;
   flex: 1;
   justify-content: center;
 }
@@ -3175,10 +3409,10 @@ a {
 .priority-badge {
   display: inline-flex;
   align-items: center;
-  padding: 5px 9px;
+  padding: 4px 8px;
   border-radius: 999px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   text-transform: uppercase;
   white-space: nowrap;
@@ -3202,9 +3436,9 @@ a {
 .ventas-executive-summary {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-  margin-bottom: 16px;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: linear-gradient(180deg, var(--primary-soft), transparent);
@@ -3215,7 +3449,7 @@ a {
   align-items: center;
   gap: 7px;
   color: var(--primary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -3224,15 +3458,15 @@ a {
 .ventas-executive-summary p {
   margin: 0;
   color: var(--text-main);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 
 .ventas-executive-summary-action {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 10px;
+  gap: 5px;
+  padding-top: 8px;
   border-top: 1px solid var(--border-soft);
 }
 
@@ -3574,6 +3808,55 @@ a {
   padding-top: 16px;
 }
 
+/* ------------------------------------------------------------------
+   Comparación embebida dentro de "Resumen de ventas"
+   ------------------------------------------------------------------ */
+.ventas-compare-section {
+  margin-top: 24px;
+}
+
+.ventas-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.ventas-section-heading svg {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.ventas-compare-card {
+  padding: 16px 18px;
+}
+
+.ventas-compare-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.ventas-compare-submit {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .ventas-compare-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .ventas-compare-submit {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .ventas-compare-summary {
   display: flex;
   justify-content: space-between;
@@ -3590,11 +3873,11 @@ a {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .ventas-recommendation-list li {
-  padding: 12px 14px;
+  padding: 9px 12px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   border-left: 3px solid rgba(255, 255, 255, 0.15);
@@ -3609,13 +3892,59 @@ a {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .ventas-recommendation-list p {
   margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
   opacity: 0.8;
   font-size: 0.88rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.ventas-compare-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ventas-compare-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-bottom: 14px;
+}
+
+.ventas-compare-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ventas-enriched-table-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  /* Evita que el navegador tenga que recalcular el layout de toda la
+     página cada vez que la tabla cambia de tamaño (nuevas filas, columnas
+     activadas/desactivadas) — la tabla scrollea dentro de su propia caja
+     en vez de empujar el resto del contenido. */
+  contain: layout paint;
+}
+
+.ventas-enriched-table-scroll .data-table thead th {
+  top: 0;
 }
 
 .spin {
@@ -3713,4 +4042,249 @@ a {
   align-items: center;
   gap: 8px;
   font-size: 13px;
+}
+
+/* ------------------------------------------------------------------
+   Limpieza de datos — versión "compacta": reduce paddings, fuentes y
+   alturas de fila (efecto "zoom out") para que quepa más contenido en
+   pantalla sin recurrir tanto al scroll interno. Todo scoped bajo
+   .cleaning-page para no afectar otras páginas que reusan las mismas
+   clases (panel-card, btn, data-table, etc).
+   ------------------------------------------------------------------ */
+.cleaning-page {
+  gap: 14px;
+  font-size: 13px;
+}
+
+.cleaning-page .panel-card {
+  padding: 14px 16px;
+}
+
+.cleaning-page .panel-title {
+  font-size: 13.5px;
+  margin-bottom: 2px;
+}
+
+.cleaning-page .panel-subtitle {
+  font-size: 11.5px;
+  margin-bottom: 10px;
+}
+
+.cleaning-page .table-section-header {
+  margin-bottom: 10px;
+}
+
+.cleaning-page .btn {
+  padding: 8px 14px;
+  font-size: 12.5px;
+}
+
+.cleaning-page .cleaning-right-card {
+  padding: 12px 14px;
+}
+
+.cleaning-page .cleaning-tabs {
+  margin-bottom: 10px;
+}
+
+.cleaning-page .cleaning-tab {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.cleaning-page .cleaning-mode-toggle {
+  margin-bottom: 10px;
+}
+
+.cleaning-page .preview-mode-btn {
+  padding: 6px 10px;
+  font-size: 11.5px;
+}
+
+.cleaning-page .preview-table-full {
+  margin-bottom: 8px;
+}
+
+.cleaning-page .preview-table-scroll .data-table th,
+.cleaning-page .preview-table-scroll .data-table td {
+  padding: 6px 10px;
+  font-size: 11.5px;
+}
+
+.cleaning-page .cleaning-top-preview .preview-table-scroll .data-table th,
+.cleaning-page .cleaning-top-preview .preview-table-scroll .data-table td {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.cleaning-page .cleaning-summary {
+  margin-top: 6px;
+}
+
+.cleaning-page .cleaning-summary span {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.cleaning-page .cleaning-export-bar {
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.cleaning-page .cleaning-export-bar .btn {
+  padding: 7px 10px;
+  font-size: 11.5px;
+}
+
+.cleaning-page .cleaning-file-list {
+  gap: 6px;
+}
+
+.cleaning-page .cleaning-file-row {
+  padding: 9px 11px;
+  gap: 6px 10px;
+}
+
+.cleaning-page .cleaning-file-name {
+  font-size: 12px;
+}
+
+.cleaning-page .cleaning-file-meta,
+.cleaning-page .cleaning-file-date {
+  font-size: 10.5px;
+}
+
+.cleaning-page .quality-badge,
+.cleaning-page .status-pill {
+  font-size: 10px;
+  padding: 3px 7px;
+}
+
+.cleaning-page .cleaning-tool {
+  padding: 9px 10px;
+  margin-bottom: 8px;
+  gap: 9px;
+}
+
+.cleaning-page .cleaning-tool strong,
+.cleaning-page .cleaning-check strong {
+  font-size: 12.5px;
+}
+
+.cleaning-page .cleaning-tool small,
+.cleaning-page .cleaning-check small {
+  font-size: 10.5px;
+}
+
+.cleaning-page .cleaning-field {
+  margin-bottom: 10px;
+}
+
+.cleaning-page .cleaning-field span,
+.cleaning-page .cleaning-option-group>span {
+  font-size: 11.5px;
+}
+
+.cleaning-page .cleaning-field select {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.cleaning-page .cleaning-option-group {
+  margin-bottom: 10px;
+  gap: 6px;
+}
+
+.cleaning-page .cleaning-option-group label,
+.cleaning-page .cleaning-check {
+  font-size: 12px;
+}
+
+.cleaning-page .cleaning-apply {
+  margin-bottom: 8px;
+}
+
+.cleaning-page .health-ring-wrap {
+  gap: 18px;
+  padding: 2px 4px;
+}
+
+.cleaning-page .health-ring {
+  width: 100px;
+  height: 100px;
+}
+
+.cleaning-page .health-metric-grid {
+  gap: 12px;
+}
+
+/* La página ahora crece con el contenido y se puede hacer scroll normal
+   en toda la ventana (ya no se fuerza a la altura de la pantalla). El
+   scroll de la página tiene un diseño propio: delgado, redondeado y con
+   los colores del tema en vez de la barra genérica del navegador. */
+.dash-content {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.dash-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dash-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dash-content::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 999px;
+  border: 3px solid var(--bg);
+  background-clip: padding-box;
+}
+
+.dash-content:hover::-webkit-scrollbar-thumb {
+  background-color: var(--primary);
+}
+
+/* Misma barra con diseño propio para el scroll interno de la tabla de
+   vista previa (la única zona de Limpieza de datos que conserva su
+   propio scroll, ligado al alto de la pantalla). */
+.cleaning-top-preview .preview-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.cleaning-top-preview .preview-table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.cleaning-top-preview .preview-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cleaning-top-preview .preview-table-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.cleaning-top-preview .preview-table-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--primary);
+}
+
+@media (max-width: 900px) {
+  .cleaning-page {
+    font-size: 14px;
+  }
+
+  .cleaning-page .panel-card {
+    padding: 20px 22px;
+  }
+
+  .cleaning-page .btn {
+    padding: 12px 22px;
+    font-size: 14.5px;
+  }
 }

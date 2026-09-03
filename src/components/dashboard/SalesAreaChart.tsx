@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -20,6 +20,12 @@ interface SalesAreaChartProps {
   /** Notifica hacia arriba qué periodo está viendo el usuario (mes y, si
    * aplica, día puntual), para que la dona de categorías se recalcule. */
   onPeriodChange: (period: { month: string | null; day: string | null }) => void
+  /** Factor de proyección en memoria (ej. 1.136 para +13.6%) que viene de
+   * "Comparar con otra farmacia". Se aplica también al detalle diario que
+   * este componente pide por su cuenta (getSalesPeriodBreakdown), para que
+   * el drill-down quede consistente con las barras del mes. null = sin
+   * proyección activa, se muestran los datos reales tal cual. */
+  projectionFactor: number | null
 }
 
 const ALL_MONTHS = '__all__'
@@ -50,7 +56,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
   )
 }
 
-export default function SalesAreaChart({ datasetId, monthly, hasDailyDetail, onPeriodChange }: SalesAreaChartProps) {
+export default memo(function SalesAreaChart({ datasetId, monthly, hasDailyDetail, onPeriodChange, projectionFactor }: SalesAreaChartProps) {
   // '__all__' = vista general (los 12 meses); cualquier otro valor es un
   // mes puntual ('YYYY-MM') que el usuario eligió del dropdown.
   const [selectedMonth, setSelectedMonth] = useState<string>(ALL_MONTHS)
@@ -80,13 +86,17 @@ export default function SalesAreaChart({ datasetId, monthly, hasDailyDetail, onP
     setLoadingDaily(true)
     getSalesPeriodBreakdown(datasetId, selectedMonth)
       .then((res) => {
-        setDailyPoints(res.daily_points)
+        const points =
+          projectionFactor != null && res.daily_points
+            ? res.daily_points.map((d) => ({ ...d, total: d.total * projectionFactor }))
+            : res.daily_points
+        setDailyPoints(points)
         onPeriodChange({ month: selectedMonth, day: null })
       })
       .catch(() => setDailyPoints(null))
       .finally(() => setLoadingDaily(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMonth, hasDailyDetail, datasetId])
+  }, [selectedMonth, hasDailyDetail, datasetId, projectionFactor])
 
   const data = useMemo(() => {
     if (selectedMonth !== ALL_MONTHS && hasDailyDetail && dailyPoints) {
@@ -141,7 +151,7 @@ export default function SalesAreaChart({ datasetId, monthly, hasDailyDetail, onP
           <div className="panel-subtitle">{subtitle}</div>
         </div>
         <select
-          className="input-field sales-area-month-select"
+          className="sales-area-month-select"
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
         >
@@ -252,4 +262,4 @@ export default function SalesAreaChart({ datasetId, monthly, hasDailyDetail, onP
       </div>
     </div>
   )
-}
+})

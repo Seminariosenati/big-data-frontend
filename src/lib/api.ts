@@ -440,6 +440,11 @@ export interface EnrichedPreview {
     ownFileName: string
     comparedFileName: string
     joinKey: string
+    /** KPIs recalculados en memoria sobre la tabla combinada (misma forma
+     * que SalesSummary). null si no se detectó columna de monto en la
+     * tabla combinada — en ese caso el frontend debe seguir mostrando los
+     * KPIs del dataset guardado. */
+    summary: SalesSummary | null
 }
 
 export async function enrichDatasetPreview(

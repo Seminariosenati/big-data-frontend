@@ -220,42 +220,170 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
 
   return (
     <div className="cleaning-page">
-      <section className="cleaning-files panel-card">
-        <div className="table-section-header">
-          <div>
-            <div className="panel-title">Archivos subidos</div>
-            <div className="panel-subtitle">Selecciona un dataset para revisar y limpiar su estructura.</div>
-          </div>
-          <button className="btn btn-outline" onClick={onGoToUpload}><FileSpreadsheet size={15} /> Subir archivo</button>
-        </div>
-        {datasets.length === 0 ? (
-          <div className="cleaning-empty">
-            <FilterX size={28} />
-            <strong>Aún no hay archivos para limpiar</strong>
-            <span>Sube un CSV o Excel para comenzar el análisis.</span>
-            <button className="btn btn-primary" onClick={onGoToUpload}>Subir primer archivo</button>
-          </div>
-        ) : (
-          <div className="data-table-wrapper">
-            <table className="data-table cleaning-table">
-              <thead><tr><th>Archivo</th><th>Filas</th><th>Columnas</th><th>Calidad</th><th>Estado</th><th>Fecha</th></tr></thead>
-              <tbody>{datasets.map((d) => (
-                <tr key={d.id} className={selected?.id === d.id ? 'selected' : ''} onClick={() => setSelectedId(d.id)}>
-                  <td><strong>{d.file_name}</strong></td>
-                  <td>{d.row_count.toLocaleString('es-PE')}</td>
-                  <td>{d.column_count}</td>
-                  <td><span className="quality-badge">{d.quality_score}%</span></td>
-                  <td><span className={`status-pill ${statusDisplay(d).pillClass}`}><CheckCircle2 size={12} />{statusDisplay(d).label}</span></td>
-                  <td>{formatDate(d.created_at)}</td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
       {selected && (
-        <div className="cleaning-workspace">
+        <section className="cleaning-health panel-card cleaning-right-card cleaning-top-preview">
+          <div className="cleaning-tabs">
+            <button
+              type="button"
+              className={`cleaning-tab ${rightTab === 'preview' ? 'active' : ''}`}
+              onClick={() => setRightTab('preview')}
+            >
+              <Table2 size={15} /> Vista Previa de Datos
+            </button>
+            <button
+              type="button"
+              className={`cleaning-tab ${rightTab === 'health' ? 'active' : ''}`}
+              onClick={() => setRightTab('health')}
+            >
+              <Activity size={15} /> Diagnóstico de Salud
+            </button>
+          </div>
+
+          <div className="cleaning-tab-body">
+            {rightTab === 'preview' ? (
+              <div className="cleaning-preview-tab">
+                <div className="cleaning-mode-toggle" role="group" aria-label="Modo de vista previa">
+                  <button
+                    type="button"
+                    className={`preview-mode-btn ${previewMode === 'original' ? 'active' : ''}`}
+                    onClick={() => setPreviewMode('original')}
+                  >
+                    Original (Antes)
+                  </button>
+                  <button
+                    type="button"
+                    className={`preview-mode-btn ${previewMode === 'cleaned' ? 'active' : ''}`}
+                    onClick={() => setPreviewMode('cleaned')}
+                  >
+                    Limpio (Después)
+                    {afterLoading && <span className="preview-mode-dot" />}
+                  </button>
+                </div>
+
+                <div className="preview-table-wrap preview-table-full">
+                  {previewMode === 'original' ? (
+                    <FullPreviewTable preview={beforePreview} loading={previewLoading} />
+                  ) : (
+                    <FullPreviewTable preview={afterPreview} loading={previewLoading || afterLoading} diffAgainst={previewMode === 'cleaned' ? beforePreview : null} />
+                  )}
+                </div>
+
+                {(previewMode === 'cleaned' && (cleanedCounts.duplicates > 0 || cleanedCounts.emptyRows > 0 || cleanedCounts.nulls > 0 || cleanedCounts.columns > 0)) && (
+                  <div className="cleaning-summary">
+                    {cleanedCounts.duplicates > 0 && <span>{cleanedCounts.duplicates} duplicados</span>}
+                    {cleanedCounts.emptyRows > 0 && <span>{cleanedCounts.emptyRows} filas vacías</span>}
+                    {cleanedCounts.nulls > 0 && <span>{cleanedCounts.nulls} nulos</span>}
+                    {cleanedCounts.columns > 0 && <span>{cleanedCounts.columns} columnas</span>}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="cleaning-health-tab">
+                <div className="health-ring-wrap">
+                  <HealthScoreRing score={healthScore} />
+                  <div className="health-ring-caption">
+                    <strong>{healthScore}<small>/100</small></strong>
+                    <span>{healthScore >= 80 ? 'Datos saludables' : healthScore >= 50 ? 'Mejorable' : 'Requiere atención'}</span>
+                  </div>
+                </div>
+
+                <div className="health-metric-grid">
+                  <div className="health-metric">
+                    <div className="health-metric-label">
+                      <span>Filas duplicadas</span>
+                      <strong>{qualityMetrics.dupPct.toFixed(1)}%</strong>
+                    </div>
+                    <div className="health-metric-bar">
+                      <span className={`health-metric-fill ${qualityMetrics.dupPct <= 1 ? 'ok' : qualityMetrics.dupPct < 5 ? 'warn' : 'bad'}`} style={{ width: `${Math.min(100, qualityMetrics.dupPct * 3)}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="health-metric">
+                    <div className="health-metric-label">
+                      <span>Valores nulos detectados</span>
+                      <strong>{qualityMetrics.nullPct.toFixed(1)}%</strong>
+                    </div>
+                    <div className="health-metric-bar">
+                      <span className={`health-metric-fill ${qualityMetrics.nullPct <= 2 ? 'ok' : qualityMetrics.nullPct < 8 ? 'warn' : 'bad'}`} style={{ width: `${Math.min(100, qualityMetrics.nullPct * 3)}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="health-metric">
+                    <div className="health-metric-label">
+                      <span>Cobertura de celdas</span>
+                      <strong>{qualityMetrics.coveragePct.toFixed(1)}%</strong>
+                    </div>
+                    <div className="health-metric-bar">
+                      <span className={`health-metric-fill healthy ${qualityMetrics.coveragePct >= 98 ? 'ok' : qualityMetrics.coveragePct >= 92 ? 'warn' : 'bad'}`} style={{ width: `${qualityMetrics.coveragePct}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="health-metric">
+                    <div className="health-metric-label">
+                      <span>Formato de fechas</span>
+                      <strong>{qualityMetrics.dateStatus}</strong>
+                    </div>
+                    <div className="health-metric-bar health-metric-bar-static">
+                      <span className={`health-metric-fill ${qualityMetrics.dateOk ? 'ok' : 'bad'}`} style={{ width: qualityMetrics.dateOk ? '100%' : '35%' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      <div className="cleaning-workspace">
+        <section className="cleaning-files panel-card">
+          <div className="table-section-header">
+            <div>
+              <div className="panel-title">Archivos subidos</div>
+              <div className="panel-subtitle">Selecciona un dataset para revisar y limpiar su estructura.</div>
+            </div>
+            <button className="btn btn-outline" onClick={onGoToUpload}><FileSpreadsheet size={15} /> Subir archivo</button>
+          </div>
+          {datasets.length === 0 ? (
+            <div className="cleaning-empty">
+              <FilterX size={28} />
+              <strong>Aún no hay archivos para limpiar</strong>
+              <span>Sube un CSV o Excel para comenzar el análisis.</span>
+              <button className="btn btn-primary" onClick={onGoToUpload}>Subir primer archivo</button>
+            </div>
+          ) : (
+            <div className="cleaning-file-list">
+              {datasets.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  className={`cleaning-file-row ${selected?.id === d.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedId(d.id)}
+                >
+                  <div className="cleaning-file-main">
+                    <strong className="cleaning-file-name" title={d.file_name}>{d.file_name}</strong>
+                    <span className="cleaning-file-meta">
+                      {d.row_count.toLocaleString('es-PE')} filas · {d.column_count} columnas
+                    </span>
+                  </div>
+                  <div className="cleaning-file-side">
+                    <span className="quality-badge">{d.quality_score}%</span>
+                    <span className={`status-pill ${statusDisplay(d).pillClass}`}><CheckCircle2 size={12} />{statusDisplay(d).label}</span>
+                    <span className="cleaning-file-date">{formatDate(d.created_at)}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selected && (
+            <div className="cleaning-export-bar">
+              <button className="btn btn-outline" disabled={!afterPreview?.rows.length} onClick={() => downloadCsv(afterPreview, selected.file_name)}><Download size={15} /> Descargar CSV limpio</button>
+              <button className="btn btn-ghost" disabled={!afterPreview?.rows.length} onClick={() => downloadCsv(afterPreview, selected.file_name.replace(/\.[^.]+$/, '.xlsx'))}>Descargar Excel limpio</button>
+            </div>
+          )}
+        </section>
+
+        {selected && (
           <section className="cleaning-tools panel-card">
             <div className="panel-title">Herramientas de limpieza</div>
             <div className="panel-subtitle">La vista previa se calcula en tiempo real para {selected.file_name}.</div>
@@ -288,125 +416,8 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
               <History size={15} /> Ver historial de limpieza
             </button>
           </section>
-
-          <section className="cleaning-health panel-card cleaning-right-card">
-            <div className="cleaning-tabs">
-              <button
-                type="button"
-                className={`cleaning-tab ${rightTab === 'preview' ? 'active' : ''}`}
-                onClick={() => setRightTab('preview')}
-              >
-                <Table2 size={15} /> Vista Previa de Datos
-              </button>
-              <button
-                type="button"
-                className={`cleaning-tab ${rightTab === 'health' ? 'active' : ''}`}
-                onClick={() => setRightTab('health')}
-              >
-                <Activity size={15} /> Diagnóstico de Salud
-              </button>
-            </div>
-
-            <div className="cleaning-tab-body">
-              {rightTab === 'preview' ? (
-                <div className="cleaning-preview-tab">
-                  <div className="cleaning-mode-toggle" role="group" aria-label="Modo de vista previa">
-                    <button
-                      type="button"
-                      className={`preview-mode-btn ${previewMode === 'original' ? 'active' : ''}`}
-                      onClick={() => setPreviewMode('original')}
-                    >
-                      Original (Antes)
-                    </button>
-                    <button
-                      type="button"
-                      className={`preview-mode-btn ${previewMode === 'cleaned' ? 'active' : ''}`}
-                      onClick={() => setPreviewMode('cleaned')}
-                    >
-                      Limpio (Después)
-                      {afterLoading && <span className="preview-mode-dot" />}
-                    </button>
-                  </div>
-
-                  <div className="preview-table-wrap preview-table-full">
-                    {previewMode === 'original' ? (
-                      <FullPreviewTable preview={beforePreview} loading={previewLoading} />
-                    ) : (
-                      <FullPreviewTable preview={afterPreview} loading={previewLoading || afterLoading} diffAgainst={previewMode === 'cleaned' ? beforePreview : null} />
-                    )}
-                  </div>
-
-                  {(previewMode === 'cleaned' && (cleanedCounts.duplicates > 0 || cleanedCounts.emptyRows > 0 || cleanedCounts.nulls > 0 || cleanedCounts.columns > 0)) && (
-                    <div className="cleaning-summary">
-                      {cleanedCounts.duplicates > 0 && <span>{cleanedCounts.duplicates} duplicados</span>}
-                      {cleanedCounts.emptyRows > 0 && <span>{cleanedCounts.emptyRows} filas vacías</span>}
-                      {cleanedCounts.nulls > 0 && <span>{cleanedCounts.nulls} nulos</span>}
-                      {cleanedCounts.columns > 0 && <span>{cleanedCounts.columns} columnas</span>}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="cleaning-health-tab">
-                  <div className="health-ring-wrap">
-                    <HealthScoreRing score={healthScore} />
-                    <div className="health-ring-caption">
-                      <strong>{healthScore}<small>/100</small></strong>
-                      <span>{healthScore >= 80 ? 'Datos saludables' : healthScore >= 50 ? 'Mejorable' : 'Requiere atención'}</span>
-                    </div>
-                  </div>
-
-                  <div className="health-metric-grid">
-                    <div className="health-metric">
-                      <div className="health-metric-label">
-                        <span>Filas duplicadas</span>
-                        <strong>{qualityMetrics.dupPct.toFixed(1)}%</strong>
-                      </div>
-                      <div className="health-metric-bar">
-                        <span className={`health-metric-fill ${qualityMetrics.dupPct <= 1 ? 'ok' : qualityMetrics.dupPct < 5 ? 'warn' : 'bad'}`} style={{ width: `${Math.min(100, qualityMetrics.dupPct * 3)}%` }} />
-                      </div>
-                    </div>
-
-                    <div className="health-metric">
-                      <div className="health-metric-label">
-                        <span>Valores nulos detectados</span>
-                        <strong>{qualityMetrics.nullPct.toFixed(1)}%</strong>
-                      </div>
-                      <div className="health-metric-bar">
-                        <span className={`health-metric-fill ${qualityMetrics.nullPct <= 2 ? 'ok' : qualityMetrics.nullPct < 8 ? 'warn' : 'bad'}`} style={{ width: `${Math.min(100, qualityMetrics.nullPct * 3)}%` }} />
-                      </div>
-                    </div>
-
-                    <div className="health-metric">
-                      <div className="health-metric-label">
-                        <span>Cobertura de celdas</span>
-                        <strong>{qualityMetrics.coveragePct.toFixed(1)}%</strong>
-                      </div>
-                      <div className="health-metric-bar">
-                        <span className={`health-metric-fill healthy ${qualityMetrics.coveragePct >= 98 ? 'ok' : qualityMetrics.coveragePct >= 92 ? 'warn' : 'bad'}`} style={{ width: `${qualityMetrics.coveragePct}%` }} />
-                      </div>
-                    </div>
-
-                    <div className="health-metric">
-                      <div className="health-metric-label">
-                        <span>Formato de fechas</span>
-                        <strong>{qualityMetrics.dateStatus}</strong>
-                      </div>
-                      <div className="health-metric-bar health-metric-bar-static">
-                        <span className={`health-metric-fill ${qualityMetrics.dateOk ? 'ok' : 'bad'}`} style={{ width: qualityMetrics.dateOk ? '100%' : '35%' }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="cleaning-export-bar">
-              <button className="btn btn-outline" disabled={!afterPreview?.rows.length} onClick={() => downloadCsv(afterPreview, selected.file_name)}><Download size={15} /> Descargar CSV limpio</button>
-              <button className="btn btn-ghost" disabled={!afterPreview?.rows.length} onClick={() => downloadCsv(afterPreview, selected.file_name.replace(/\.[^.]+$/, '.xlsx'))}>Descargar Excel limpio</button>
-            </div>
-          </section>
-        </div>
-      )}
+        )}
+      </div>
 
       {historyOpen && (
         <CleaningHistoryModal datasets={datasets} onClose={() => setHistoryOpen(false)} />

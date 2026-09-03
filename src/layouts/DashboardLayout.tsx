@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   Database,
   LayoutDashboard,
@@ -10,6 +10,10 @@ import {
   Sun,
   Moon,
   LogOut,
+  ChevronsLeft,
+  ChevronsRight,
+  Menu,
+  X,
 } from 'lucide-react'
 
 export type DashboardSection = 'resumen' | 'cargar' | 'explorar' | 'ventas' | 'reportes' | 'ajustes'
@@ -69,17 +73,58 @@ export default function DashboardLayout({
     ? ALL_NAV_ITEMS.filter((item) => visibleSections.includes(item.key))
     : ALL_NAV_ITEMS
 
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('dash_sidebar_collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('dash_sidebar_collapsed', collapsed ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }, [collapsed])
+
+  // Al navegar a otra sección en móvil, cierra el menú desplegable.
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [active])
+
   return (
-    <div className="dash-shell">
-      <aside className="dash-sidebar">
+    <div className={`dash-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
+      <button
+        type="button"
+        className="dash-mobile-toggle"
+        onClick={() => setMobileOpen((v) => !v)}
+        aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+      >
+        {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+        <span className="dash-brand-name">Datalume</span>
+      </button>
+
+      <aside className={`dash-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="dash-brand">
           <span className="brand-mark">
             <Database size={18} strokeWidth={2.2} />
           </span>
-          <div>
+          <div className="dash-brand-text">
             <div className="dash-brand-name">Datalume</div>
             <div className="dash-brand-tag">PANEL DE DATOS</div>
           </div>
+          <button
+            type="button"
+            className="dash-collapse-btn"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+            title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+          >
+            {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+          </button>
         </div>
 
         <nav className="dash-nav">
@@ -90,34 +135,37 @@ export default function DashboardLayout({
                 key={item.key}
                 className={`dash-nav-item ${active === item.key ? 'active' : ''}`}
                 onClick={() => onNavigate(item.key)}
+                title={collapsed ? item.label : undefined}
               >
                 <Icon size={17} strokeWidth={2} />
-                {item.label}
+                <span className="dash-nav-label">{item.label}</span>
               </button>
             )
           })}
         </nav>
 
         <div className="dash-sidebar-footer">
-          <button className="dash-theme-toggle" onClick={onToggleTheme}>
+          <button className="dash-theme-toggle" onClick={onToggleTheme} title={collapsed ? (isLight ? 'Modo oscuro' : 'Modo claro') : undefined}>
             {isLight ? <Moon size={16} /> : <Sun size={16} />}
-            {isLight ? 'Modo oscuro' : 'Modo claro'}
+            <span className="dash-nav-label">{isLight ? 'Modo oscuro' : 'Modo claro'}</span>
           </button>
 
           <div className="dash-user">
             <span className="dash-user-avatar">{initials}</span>
-            <div>
+            <div className="dash-nav-label">
               <div className="dash-user-name">{userEmail ?? 'Cargando…'}</div>
               <div className="dash-user-role">{userName || 'Sin nombre'}</div>
             </div>
           </div>
 
-          <button className="dash-logout" onClick={onLogout}>
+          <button className="dash-logout" onClick={onLogout} title={collapsed ? 'Cerrar sesión' : undefined}>
             <LogOut size={15} />
-            Cerrar sesión
+            <span className="dash-nav-label">Cerrar sesión</span>
           </button>
         </div>
       </aside>
+
+      {mobileOpen && <div className="dash-sidebar-scrim" onClick={() => setMobileOpen(false)} />}
 
       <div className="dash-main">
         <header className="dash-topbar">

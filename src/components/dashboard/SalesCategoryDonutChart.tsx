@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 
 interface SalesCategoryDonutChartProps {
@@ -16,18 +16,20 @@ const COLORS = ['#f59e0b', '#fb923c', '#f97316', '#fbbf24', '#fde68a', '#d97706'
 const formatMoney = (value: number) =>
     value.toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
-function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name?: string; value?: number }> }) {
+function CustomTooltip({ active, payload, total }: { active?: boolean; payload?: Array<{ name?: string; value?: number }>; total: number }) {
     if (!active || !payload || payload.length === 0) return null
     const item = payload[0]
+    const value = item.value ?? 0
+    const pct = total > 0 ? (value / total) * 100 : 0
     return (
         <div className="sales-area-tooltip">
             <strong>{item.name}</strong>
-            <span> · S/ {formatMoney(item.value ?? 0)}</span>
+            <span> · S/ {formatMoney(value)} · {pct.toFixed(1)}%</span>
         </div>
     )
 }
 
-export default function SalesCategoryDonutChart({
+export default memo(function SalesCategoryDonutChart({
     categories,
     loading,
     fileName,
@@ -44,6 +46,8 @@ export default function SalesCategoryDonutChart({
         const restTotal = rest.reduce((sum, c) => sum + c.total, 0)
         return restTotal > 0 ? [...top, { name: 'Otros', total: restTotal }] : top
     }, [categories])
+
+    const grandTotal = useMemo(() => data.reduce((sum, d) => sum + d.total, 0), [data])
 
     return (
         <div className="panel-card">
@@ -81,7 +85,7 @@ export default function SalesCategoryDonutChart({
                                     <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip content={<CustomTooltip />} />
+                            <Tooltip content={<CustomTooltip total={grandTotal} />} />
                             <Legend
                                 layout="vertical"
                                 verticalAlign="middle"
@@ -94,4 +98,4 @@ export default function SalesCategoryDonutChart({
             )}
         </div>
     )
-}
+})

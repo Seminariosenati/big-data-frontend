@@ -31,7 +31,7 @@ export default function Navbar() {
             ))}
           </nav>
           <div className="navbar-actions">
-            <Link to="/login" className="btn btn-outline btn-sm">
+            <Link to="login" className="btn btn-outline btn-sm">
               Iniciar sesión
             </Link>
             <Link to="/login?modo=crear" className="btn btn-primary">

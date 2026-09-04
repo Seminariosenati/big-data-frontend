@@ -24,7 +24,7 @@ export default function Footer() {
             <h4>Producto</h4>
             <ul>
               <li><Link to="/servicios">Servicios</Link></li>
-              <li><Link to="/login">Iniciar sesión</Link></li>
+              <li><Link to="login">Iniciar sesión</Link></li>
               <li><Link to="/login?modo=crear">Crear cuenta</Link></li>
             </ul>
           </div>

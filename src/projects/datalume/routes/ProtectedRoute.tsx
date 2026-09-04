@@ -23,5 +23,5 @@ export default function ProtectedRoute() {
     return <div className="route-loading">Validando sesión...</div>
   }
 
-  return authorized ? <Outlet /> : <Navigate to="/login" replace />
+  return authorized ? <Outlet /> : <Navigate to="../login" replace />
 }

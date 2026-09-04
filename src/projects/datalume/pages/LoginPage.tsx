@@ -15,7 +15,7 @@ export default function LoginPage() {
     <div className="auth-page">
       <aside className="auth-visual">
         <div>
-          <Link to="/" className="auth-back-link">
+          <Link to="../" className="auth-back-link">
             <ArrowLeft size={14} /> Volver al inicio
           </Link>
 

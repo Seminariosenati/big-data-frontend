@@ -66,7 +66,7 @@ export default function LandingPage() {
               <Link to="/login?modo=crear" className="btn btn-primary btn-lg">
                 Crear cuenta gratis
               </Link>
-              <Link to="/login" className="btn btn-outline btn-lg">
+              <Link to="login" className="btn btn-outline btn-lg">
                 Iniciar sesión
               </Link>
             </div>

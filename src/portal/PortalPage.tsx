@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import ProjectCard from './ProjectCard'
-import { Database, LayoutGrid } from 'lucide-react'
+import { Database, LayoutGrid, LogOut } from 'lucide-react'
+import { clearPortalSession } from '../lib/portalApi'
 import './portal.css'
 
 interface ProjectDef {
@@ -20,18 +21,15 @@ const projects: ProjectDef[] = [
     path: '/proyectos/datalume',
     tag: 'Datos',
   },
-  // Agrega aquí el resto de tus proyectos:
-  // {
-  //   id: 'otro-proyecto',
-  //   name: 'Otro Proyecto',
-  //   description: 'Descripción corta de qué hace.',
-  //   path: '/proyectos/otro-proyecto',
-  //   tag: 'Ventas',
-  // },
 ]
 
 export default function PortalPage() {
   const navigate = useNavigate()
+
+  const handleLogout = () => {
+    clearPortalSession()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="portal-page">
@@ -44,6 +42,13 @@ export default function PortalPage() {
             <strong>Mis Proyectos</strong>
             <span>Selecciona un proyecto para entrar a su panel</span>
           </div>
+        </div>
+
+        <div className="portal-header-actions">
+          <button type="button" className="portal-logout-btn" onClick={handleLogout}>
+            <LogOut size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+            Cerrar sesión
+          </button>
         </div>
       </header>
 
@@ -59,7 +64,6 @@ export default function PortalPage() {
           />
         ))}
 
-        {/* Placeholder para invitar a agregar más proyectos */}
         <button className="portal-card portal-card--add" type="button" disabled>
           <span className="portal-card-add-icon">+</span>
           <span>Próximo proyecto</span>

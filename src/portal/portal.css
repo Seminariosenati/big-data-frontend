@@ -1,0 +1,160 @@
+/* Estilos del dashboard general (portal de proyectos).
+   Reutiliza las variables de tema definidas en src/styles/index.css
+   (--bg, --panel, --primary, etc.), así que ese archivo debe estar
+   importado globalmente (por ejemplo en main.tsx) antes de este. */
+
+.portal-page {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 48px 40px;
+  font-family: var(--font-body);
+}
+
+.portal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 36px;
+}
+
+.portal-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.portal-brand-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.portal-brand strong {
+  display: block;
+  font: 700 20px var(--font-display);
+  color: var(--text-main);
+}
+
+.portal-brand span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.portal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.portal-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  min-height: 190px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  color: inherit;
+  font-family: inherit;
+}
+
+.portal-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-panel);
+}
+
+.portal-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.portal-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--panel-soft);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portal-card-tag {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--secondary);
+  background: var(--secondary-soft);
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+
+.portal-card-body {
+  margin-top: 18px;
+}
+
+.portal-card-body strong {
+  display: block;
+  font: 700 17px var(--font-display);
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.portal-card-body p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.portal-card-footer {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.portal-card--add {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-faint);
+  border-style: dashed;
+  cursor: default;
+}
+
+.portal-card--add:hover {
+  transform: none;
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.portal-card-add-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.portal-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+}

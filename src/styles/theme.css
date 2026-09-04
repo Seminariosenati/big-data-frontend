@@ -1,0 +1,82 @@
+/* =========================================================
+   Tema global — variables compartidas por el portal y
+   todos los proyectos (Datalume, etc.)
+   Paleta: grafito violeta oscuro + ámbar/cobre + azul acento
+   Tipografía: Space Grotesk (display) / Inter (cuerpo) / JetBrains Mono (datos)
+   ========================================================= */
+
+:root {
+  --bg: #12101b;
+  --bg-soft: #17141f;
+  --panel: #1c1927;
+  --panel-soft: #232030;
+  --border: #302c40;
+  --border-soft: #262234;
+
+  --text-main: #f3f1fa;
+  --text-muted: #9b96ad;
+  --text-faint: #6f6b81;
+
+  --primary: #e8a33d;
+  --primary-hover: #d6922e;
+  --primary-soft: rgba(232, 163, 61, 0.14);
+
+  --secondary: #5b8def;
+  --secondary-soft: rgba(91, 141, 239, 0.14);
+
+  --success: #4ade80;
+  --success-soft: rgba(74, 222, 128, 0.14);
+  --danger: #f0645a;
+  --danger-soft: rgba(240, 100, 90, 0.14);
+
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --shadow-panel: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='light'] {
+  --bg: #efece6;
+  --bg-soft: #e8e4dc;
+  --panel: #fbfaf7;
+  --panel-soft: #f0ede6;
+  --border: #ddd6c7;
+  --border-soft: #e6e1d5;
+
+  --text-main: #2b2738;
+  --text-muted: #726c80;
+  --text-faint: #9a94a5;
+
+  --shadow-panel: 0 12px 30px rgba(32, 28, 44, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, rgba(232, 163, 61, 0.07) 1px, transparent 1px);
+  background-size: 26px 26px;
+  color: var(--text-main);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}

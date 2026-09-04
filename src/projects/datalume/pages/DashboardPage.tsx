@@ -12,8 +12,8 @@ import EmptyState from '../components/dashboard/EmptyState'
 import DataCleaningPanel from '../components/dashboard/DataCleaningPanel'
 import SettingsPage from './SettingsPage'
 import VentasPage, { type VentasSubmodule } from './VentasPage'
-import { useDatasets } from '../projects/datalume/lib/useDatasets'
-import { ChartViewProvider } from '../projects/datalume/lib/ChartViewProvider'
+import { useDatasets } from '../lib/useDatasets'
+import { ChartViewProvider } from '../lib/ChartViewProvider'
 import ChartViewToggle from '../components/dashboard/ChartViewToggle'
 import {
   clearSession,
@@ -22,7 +22,7 @@ import {
   DEFAULT_ANALYST_PERMISSIONS,
   type Profile,
   type AnalystPermissions,
-} from '../projects/datalume/lib/api'
+} from '../lib/api'
 
 const SECTION_META: Record<DashboardSection, { title: string; subtitle: string }> = {
   resumen: { title: 'Dashboard', subtitle: 'Vista general de tus datos procesados' },

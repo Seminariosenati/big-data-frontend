@@ -282,7 +282,6 @@ export default function DataCleaningPanel({ datasets, loading, onGoToUpload, onC
                 <div className="health-ring-wrap">
                   <HealthScoreRing score={healthScore} />
                   <div className="health-ring-caption">
-                    <strong>{healthScore}<small>/100</small></strong>
                     <span>{healthScore >= 80 ? 'Datos saludables' : healthScore >= 50 ? 'Mejorable' : 'Requiere atención'}</span>
                   </div>
                 </div>

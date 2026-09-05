@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ProjectCard from './ProjectCard'
 import ProjectRequestModal from './ProjectRequestModal'
-import { ChevronDown, Database, LayoutGrid, LogOut, Plus } from 'lucide-react'
+import { ChevronDown, Database, LayoutGrid, LogOut, Plus, Shield } from 'lucide-react'
 import {
   clearPortalSession,
   getProfile,
@@ -129,6 +129,17 @@ export default function PortalPage() {
                       <strong>{profile.full_name || 'Sin nombre'}</strong>
                       <span>{profile.email}</span>
                     </div>
+                    {profile.role === 'admin' && (
+                      <button
+                        type="button"
+                        className="portal-logout-btn"
+                        onClick={() => navigate('/admin')}
+                        role="menuitem"
+                      >
+                        <Shield size={15} />
+                        Panel de administración
+                      </button>
+                    )}
                     <button type="button" className="portal-logout-btn" onClick={handleLogout} role="menuitem">
                       <LogOut size={15} />
                       Cerrar sesión

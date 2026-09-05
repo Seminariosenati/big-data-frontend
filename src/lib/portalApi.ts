@@ -9,10 +9,6 @@ export interface AuthSession {
 
 let refreshPromise: Promise<boolean> | null = null
 
-// Intenta renovar el access token usando el refresh token guardado.
-// Se comparte una sola promesa entre llamadas concurrentes para no
-// disparar varios /auth/refresh en paralelo si varios requests fallan
-// con 401 al mismo tiempo (mismo patrón que projects/datalume/lib/api.ts).
 async function tryRefreshPortalSession(): Promise<boolean> {
   const session = getPortalSession()
   if (!session) return false
@@ -167,4 +163,68 @@ export function requestNewProject(input: ProjectRequestInput) {
     headers: authHeaders(),
     body: JSON.stringify(input),
   })
+}
+
+// ---------------------------------------------------------
+// Admin
+// ---------------------------------------------------------
+export interface AdminInvitation {
+  id: string
+  email: string
+  project_id: string
+  type: string
+  expires_at: string
+  used: boolean
+  created_at: string
+  projects?: { name: string }
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  full_name: string | null
+  role: string
+  company: string | null
+  project_access: { project_id: string; project_name: string | null; role: string }[]
+}
+
+export function getAdminUsers() {
+  return request<AdminUser[]>('/admin/users', { method: 'GET', headers: authHeaders() })
+}
+
+export function updateAdminUser(
+  userId: string,
+  input: { role?: string; project_access?: { project_id: string; role: string }[] }
+) {
+  return request<{ message: string }>(`/admin/users/${userId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteAdminUser(userId: string) {
+  return request<void>(`/admin/users/${userId}`, { method: 'DELETE', headers: authHeaders() })
+}
+
+export function getAdminInvitations() {
+  return request<AdminInvitation[]>('/admin/invitations', { method: 'GET', headers: authHeaders() })
+}
+
+export interface CreateInvitationInput {
+  email: string
+  project_ids: string[]
+  expires_days?: number
+}
+
+export function createAdminInvitation(input: CreateInvitationInput) {
+  return request<AdminInvitation[]>('/admin/invitations', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(input),
+  })
+}
+
+export function revokeAdminInvitation(id: string) {
+  return request<void>(`/admin/invitations/${id}`, { method: 'DELETE', headers: authHeaders() })
 }

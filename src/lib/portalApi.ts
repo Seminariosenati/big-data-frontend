@@ -7,7 +7,39 @@ export interface AuthSession {
   refresh_token: string
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let refreshPromise: Promise<boolean> | null = null
+
+// Intenta renovar el access token usando el refresh token guardado.
+// Se comparte una sola promesa entre llamadas concurrentes para no
+// disparar varios /auth/refresh en paralelo si varios requests fallan
+// con 401 al mismo tiempo (mismo patrón que projects/datalume/lib/api.ts).
+async function tryRefreshPortalSession(): Promise<boolean> {
+  const session = getPortalSession()
+  if (!session) return false
+
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    })
+      .then(async (res) => {
+        if (!res.ok) return false
+        const data = await res.json().catch(() => null)
+        if (!data?.session?.access_token || !data?.session?.refresh_token) return false
+        savePortalSession(data.session)
+        return true
+      })
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+
+  return refreshPromise
+}
+
+async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -15,6 +47,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       ...options.headers,
     },
   })
+
+  if (res.status === 401 && !isRetry && getPortalSession() && path !== '/auth/refresh') {
+    const refreshed = await tryRefreshPortalSession()
+    if (refreshed) {
+      return request<T>(path, { ...options, headers: { ...options.headers, ...authHeaders() } }, true)
+    }
+    clearPortalSession()
+  }
+
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     throw new Error(data.detail || data.error || data.message || 'Ocurrió un error inesperado')
@@ -22,11 +63,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T
 }
 
+export interface PortalLoginResponse {
+  message: string
+  email: string
+  requiresOtp: boolean
+  otpDestination?: string
+  session?: AuthSession
+}
+
 export function portalLogin(email: string) {
-  return request<{ message: string; email: string; requiresOtp: true; otpDestination: string }>(
-    '/auth/portal/login',
-    { method: 'POST', body: JSON.stringify({ email }) },
-  )
+  return request<PortalLoginResponse>('/auth/portal/login', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
 }
 
 export function portalVerifyOtp(email: string, code: string) {
@@ -49,7 +98,7 @@ export function savePortalSession(session: AuthSession) {
 }
 
 export function getPortalSession(): AuthSession | null {
-  const raw = localStorage.getItem(SESSION_KEY) || localStorage.getItem('datalume_session')
+  const raw = localStorage.getItem(SESSION_KEY)
   if (!raw) return null
   try {
     const session = JSON.parse(raw) as AuthSession
@@ -64,6 +113,58 @@ export function clearPortalSession() {
   localStorage.removeItem('datalume_session')
 }
 
+export function authHeaders(): Record<string, string> {
+  const session = getPortalSession()
+  return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+}
+
+export interface PortalProfile {
+  id: string
+  email: string
+  full_name?: string | null
+  role?: string | null
+  company?: string | null
+}
+
+export function getProfile() {
+  return request<PortalProfile>('/profile/me', {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+}
+
 export function isPortalAuthenticated(): boolean {
   return getPortalSession() !== null
+}
+
+export interface PortalProject {
+  id: string
+  slug: string
+  name: string
+  description: string
+  path: string
+  tag: string
+  accent: 'primary' | 'secondary'
+  sort_order: number
+}
+
+export function getProjects() {
+  return request<PortalProject[]>('/projects', {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+}
+
+export interface ProjectRequestInput {
+  name: string
+  description?: string
+  contact_email: string
+}
+
+export function requestNewProject(input: ProjectRequestInput) {
+  return request<{ id: string }>('/projects/requests', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(input),
+  })
 }

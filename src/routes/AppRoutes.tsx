@@ -4,6 +4,7 @@ import { lazy, Suspense } from 'react'
 import PortalPage from '../portal/PortalPage'
 import PortalLoginPage from '../portal/PortalLoginPage'
 import { isPortalAuthenticated } from '../lib/portalApi'
+import '../portal/portal.css'
 
 const DatalumeApp = lazy(() => import('../projects/datalume/App'))
 
@@ -23,7 +24,14 @@ function RedirectIfAuthenticated({ children }: { children: React.ReactNode }) {
 
 export default function AppRoutes() {
   return (
-    <Suspense fallback={<div className="portal-loading">Cargando proyecto…</div>}>
+    <Suspense
+      fallback={
+        <div className="portal-loading">
+          <span className="portal-loading-spinner" aria-hidden="true" />
+          <span>Cargando proyecto…</span>
+        </div>
+      }
+    >
       <Routes>
         <Route
           path="/login"

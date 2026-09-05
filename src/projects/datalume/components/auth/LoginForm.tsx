@@ -38,7 +38,7 @@ export default function LoginForm() {
     try {
       const { session } = await verifyOtp({ email, code })
       saveSession(session)
-      navigate('/dashboard')
+      navigate('../dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Código incorrecto')
     } finally {
